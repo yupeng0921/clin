@@ -1,0 +1,10 @@
+#! /usr/bin/python
+
+import sys
+import clin.cloud_parser
+
+def main():
+    return clin.cloud_parser.main()
+
+if __name__ == '__main__':
+    sys.exit(main())
