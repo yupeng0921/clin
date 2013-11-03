@@ -38,7 +38,10 @@ def clin_deploy(argv):
     def deploy_usage():
         print(u'deploy_usage')
 
-    long_params = [u'stack-name=', u'producter=', u'region=', u'parameter=', u'instance-conf=', u'parameter-file=', u'yes', u'debug']
+    long_params = [u'stack-name=', u'producter=', u'region=', \
+                       u'parameter=', u'instance-conf=', \
+                       u'parameter-file=', u'dump-parameter=', \
+                       u'yes', u'debug']
     try:
         opts, args = getopt.gnu_getopt(argv, u'y', long_params)
     except getopt.GetoptError, e:
@@ -51,6 +54,7 @@ def clin_deploy(argv):
     parameter_file = None
     use_default = False
     debug = False
+    dump_parameter = u'no'
     parameter_list = []
     instance_conf_list = []
     for o, a in opts:
@@ -68,6 +72,12 @@ def clin_deploy(argv):
             parameter_list.append(a)
         elif o == u'--instance-conf':
             instance_conf_list.append(a)
+        elif o == u'--dump-parameter':
+            if a in (u'no', u'yes', u'only'):
+                dump_parameter = a
+            else:
+                print(u'invalid dump-parameter: %s, should be no, yes, only' % a)
+                sys.exit(1)
         elif o in (u'-y', '--yes'):
             use_default = True
         elif o == u'--debug':
@@ -94,7 +104,8 @@ def clin_deploy(argv):
     if u'Version' in template:
         v = template[u'Version']
         if v == 1:
-            deploy_version_1(template)
+            deploy_version_1(template, stack_name, producter, region, parameter_file, \
+                                 use_default, debug, dump_parameter, parameter_list, instance_conf_list)
         else:
             print(u'unsupport version: %s' % unicode(v))
             sys.exit(1)
