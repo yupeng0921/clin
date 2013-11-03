@@ -76,26 +76,26 @@ def clin_deploy(argv):
             if a in (u'no', u'yes', u'only'):
                 dump_parameter = a
             else:
-                print(u'invalid dump-parameter: %s, should be no, yes, only' % a)
+                sys.stdout.write(u'invalid dump-parameter: %s, should be no, yes, only' % a)
                 sys.exit(1)
         elif o in (u'-y', '--yes'):
             use_default = True
         elif o == u'--debug':
             debug = True
         else:
-            print(u'invalid args: %s %s' % (o, a))
+            sys.stdout.write(u'invalid args: %s %s' % (o, a))
             sys.exit(1)
 
     if len(args) != 1:
-        print(u'should specific 1 and only 1 service name')
+        sys.stdout.write(u'should specific 1 and only 1 service name')
         for a in args:
-            print(a)
+            sys.stdout.write(a)
         deploy_usage()
         sys.exit(1)
     service_name = args[0]
 
     if not stack_name:
-        print(u'no stack name')
+        sys.stdout.write(u'no stack name')
         deploy_usage()
         sys.exit(1)
 
@@ -107,10 +107,10 @@ def clin_deploy(argv):
             deploy_version_1(template, stack_name, producter, region, parameter_file, \
                                  use_default, debug, dump_parameter, parameter_list, instance_conf_list)
         else:
-            print(u'unsupport version: %s' % unicode(v))
+            sys.stdout.write(u'unsupport version: %s' % unicode(v))
             sys.exit(1)
     else:
-        print(u'should specific Version in template')
+        sys.stdout.write(u'should specific Version in template')
         sys.exit(1)
 
 @subcmd(u'describe')
