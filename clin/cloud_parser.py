@@ -9,7 +9,7 @@ import yaml
 from parsing_version_1 import deploy_version_1
 
 def load_local_template_file(template_file):
-    with open(template_file) as f:
+    with open(template_file, 'r') as f:
         template = yaml.safe_load(f)
     return template
 

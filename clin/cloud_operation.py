@@ -10,7 +10,7 @@ class CloudOperation():
     def get_region(self):
         pass
     @abstractmethod
-    def get_instance_configure(self, name):
+    def get_instance_configure(self, name, description):
         pass
     @abstractmethod
     def launch_instance(self, uuid, name, os_name, security_group_rules):
@@ -29,4 +29,7 @@ class CloudOperation():
         pass
     @abstractmethod
     def terminate_all_instances(self):
+        pass
+    @abstractmethod
+    def return_all_configure(self):
         pass

@@ -67,8 +67,51 @@ class AwsOperation(CloudOperation):
         os.mkdir(dir1)
         self.__key_pair.save(u'%s/key.pem' % dir1)
 
-    def get_instance_configure(self, name):
-        pass
+    def get_instance_configure(self, name, description):
+        instance_types = [u't1.micro', u'm1.small', u'm1.medium', u'm1.large',
+                         u'm1.xlarge', u'm3.xlarge', u'm3.2xlarge']
+        instance_type = None
+        volume_size = None
+        if name in self.__input_param_dict:
+            if u'instance_type' in self.__input_param_dict[name]:
+                instance_type = self.__input_param_dict[name][u'instance_type']
+                if not instance_type in instance_types:
+                    sys.stderr.write(u'instance_type wrong, %s %s\n' % \
+                                         name, instance_type)
+                    sys.exit(1)
+            if u'volume_size' in self.__input_param_dict[name]:
+                volume_size = self.__input_param_dict[name][u'volume_size']
+                if not type(volume_size) is types.IntType:
+                    sys.stderr.write(u'volume_size wrong, %s %s\n' % \
+                                         name, volume_size)
+                    sys.exit(1)
+        if (not instance_type) or (not volume_size):
+            if description:
+                instance_info = description
+            else:
+                instance_info = name
+            instance_info = u'%s:\n' % instance_info
+            sys.stdout.write(instance_info)
+        if not instance_type:
+            while True:
+                for instance_type in instance_types:
+                    sys.stdout.write('%s\n' % instance_type)
+                prompt = u'select an instance type:'
+                instance_type = raw_input(prompt)
+                if instance_type in instance_types:
+                    break
+        if not volume_size:
+            while True:
+                prompt = u'default volume size (Gbyte):'
+                volume_size = raw_input(prompt)
+                try:
+                    volume_size = int(volume_size)
+                except Exception, e:
+                    continue
+                else:
+                    break
+        self.__name_to_conf[name] = {u'instance_type': instance_type, u'volume_size':volume_size}
+
     def launch_instance(self, uuid, name, os_name, security_group_rules):
         pass
     def wait_instance(self, uuid):
@@ -81,3 +124,9 @@ class AwsOperation(CloudOperation):
         pass
     def terminate_all_instances(self):
         pass
+    def return_all_configure(self):
+        ret_dict = {}
+        ret_dict[u'region'] = self.__region
+        for name in self.__name_to_conf:
+            ret_dict[name] = self.__name_to_conf[name]
+        return ret_dict
