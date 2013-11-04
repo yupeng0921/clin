@@ -4,6 +4,7 @@ from cloud_operation import CloudOperation
 import os
 import sys
 import time
+import types
 
 try:
     import boto.ec2

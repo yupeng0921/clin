@@ -209,8 +209,7 @@ def deploy_version_1(template, stack_name, producter, parameter_file, \
         if op:
             producter_instance_dict = {}
             producter_instance_dict[producter] = op.return_all_configure()
-            dump_dict[u'Instancnes'] = producter_instance_dict
-        # dump_data = yaml.safe_dump(dump_dict)
+            dump_dict[u'Instances'] = producter_instance_dict
         file_name = u'%s-%s.conf' % (stack_name, int(time.time()))
         with open(file_name, 'w') as f:
             yaml.safe_dump(dump_dict, f)
