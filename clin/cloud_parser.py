@@ -3,6 +3,7 @@
 # -*- coding: utf-8 -*-
 
 import sys
+import os
 import getopt
 import yaml
 from parsing_version_1 import deploy_version_1
@@ -38,9 +39,9 @@ def clin_deploy(argv):
     def deploy_usage():
         print(u'deploy_usage')
 
-    long_params = [u'stack-name=', u'producter=', u'region=', \
+    long_params = [u'stack-name=', u'producter=', \
                        u'parameter-file=', u'dump-parameter=', \
-                       u'yes', u'debug']
+                       u'yes', u'debug', u'conf-dir']
     try:
         opts, args = getopt.gnu_getopt(argv, u'y', long_params)
     except getopt.GetoptError, e:
@@ -51,6 +52,7 @@ def clin_deploy(argv):
     producter = None
     region = None
     parameter_file = None
+    conf_dir = None
     use_default = False
     debug = False
     dump_parameter = u'no'
@@ -73,6 +75,8 @@ def clin_deploy(argv):
                 sys.exit(1)
         elif o in (u'-y', '--yes'):
             use_default = True
+        elif o == u'--conf-dir':
+            conf_dir = a
         elif o == u'--debug':
             debug = True
         else:
@@ -92,13 +96,20 @@ def clin_deploy(argv):
         deploy_usage()
         sys.exit(1)
 
+    if not conf_dir:
+        if u'HOME' in os.environ:
+            conf_dir = os.environ['HOME']
+        else:
+            conf_dir = os.getcwd()
+    conf_dir = conf_dir + u'/.clin'
+
     template = load_template(service_name)
 
     if u'Version' in template:
         v = template[u'Version']
         if v == 1:
-            deploy_version_1(template, stack_name, producter, region, parameter_file, \
-                                 use_default, debug, dump_parameter)
+            deploy_version_1(template, stack_name, producter, parameter_file, \
+                                 use_default, debug, dump_parameter, conf_dir)
         else:
             sys.stderr.write(u'unsupport version: %s' % v)
             sys.exit(1)

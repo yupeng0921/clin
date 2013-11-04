@@ -94,8 +94,8 @@ class Parameters():
     def return_parameter_dict(self):
         return self.__parameter_dict
 
-def deploy_version_1(template, stack_name, producter, region, parameter_file, \
-                         use_default, debug, dump_parameter):
+def deploy_version_1(template, stack_name, producter, parameter_file, \
+                         use_default, debug, dump_parameter, conf_dir):
     input_parameter_dict = {}
     input_producter_dict = {}
     if parameter_file:
@@ -120,12 +120,11 @@ def deploy_version_1(template, stack_name, producter, region, parameter_file, \
         parameter_dict = p.return_parameter_dict()
         print parameter_dict
 
-    sys.exit(0)
     valid_producter = producter_dict.keys()
     if producter:
         if not producter in valid_producter:
             sys.stderr(u'invalid producter name: %s\n' % producter)
-            sys.stderr(u'only support: %s\n' % unicode(valid_producter))
+            sys.stderr(u'only support: %s\n' % valid_producter)
             sys.exit(1)
     else:
         prompt = u'producter name:'
@@ -134,6 +133,14 @@ def deploy_version_1(template, stack_name, producter, region, parameter_file, \
             if producter in valid_producter:
                 break
 
+    if dump_parameter == u'only':
+        only_dump = True
+    else:
+        only_dump = False
     op_class = producter_dict[producter]
-    op = op_class(stack_name)
-    op.get_region(regoin)
+    if producter in input_producter_dict:
+        input_param_dict = input_producter_dict[producter]
+    else:
+        input_param_dict = {}
+    op = op_class(stack_name, conf_dir, only_dump, input_param_dict)
+    op.get_region()

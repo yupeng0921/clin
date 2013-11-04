@@ -4,13 +4,13 @@ from abc import ABCMeta, abstractmethod
 class CloudOperation():
     __metaclass__ = ABCMeta
     @abstractmethod
-    def __init__(self, stack_name):
-        self.__stack_name = stack_name
-    @abstractmethod
-    def get_region(self, input_region):
+    def __init__(self, stack_name, conf_dir, only_dump, input_param_dict):
         pass
     @abstractmethod
-    def get_instance_configure(self, name, param_list):
+    def get_region(self):
+        pass
+    @abstractmethod
+    def get_instance_configure(self, name):
         pass
     @abstractmethod
     def launch_instance(self, uuid, name, os_name, security_group_rules):
@@ -26,4 +26,7 @@ class CloudOperation():
         pass
     @abstractmethod
     def terminate_instance(self, uuid):
+        pass
+    @abstractmethod
+    def terminate_all_instances(self):
         pass
