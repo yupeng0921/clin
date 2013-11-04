@@ -20,8 +20,7 @@ class AwsOperation(CloudOperation):
     def __init__(self, stack_name, conf_dir, only_dump, input_param_dict):
         global load_boto
         if not only_dump and not load_boto:
-            sys.stderr.write(u'boto is not install, please install it and this command again\n')
-            sys.exit(1)
+            raise Exception(u'boto is not install, please install it and this command again\n')
         self.__stack_name = stack_name
         self.__conf_dir = conf_dir
         self.__only_dump = only_dump
@@ -34,7 +33,7 @@ class AwsOperation(CloudOperation):
         if u'region' in self.__input_param_dict:
             region = self.__input_param_dict[u'region']
             if not region in regions:
-                sys.stderr(u'invalid region: %s' % region)
+                raise Exception(u'invalid region: %s' % region)
         else:
             while True:
                 for region in regions:
@@ -50,9 +49,7 @@ class AwsOperation(CloudOperation):
         try:
             self.__key_pair = self.__conn.create_key_pair(self.__stack_name)
         except boto.exception.EC2ResponseError, e:
-            sys.stderr.write(u'create keypair failed, maybe stack already exist')
-            sys.stderr.write(e)
-            sys.exit(1)
+            raise Exception(u'create keypair failed, maybe stack already exist\n%s', e)
         conf_dir = self.__conf_dir
         if not os.path.exists(conf_dir):
             os.mkdir(conf_dir)
@@ -77,26 +74,23 @@ class AwsOperation(CloudOperation):
             if u'instance_type' in self.__input_param_dict[name]:
                 instance_type = self.__input_param_dict[name][u'instance_type']
                 if not instance_type in instance_types:
-                    sys.stderr.write(u'instance_type wrong, %s %s\n' % \
-                                         name, instance_type)
-                    sys.exit(1)
+                    raise Exception(u'instance_type wrong, %s %s' % \
+                                        name, instance_type)
             if u'volume_size' in self.__input_param_dict[name]:
                 volume_size = self.__input_param_dict[name][u'volume_size']
                 if not type(volume_size) is types.IntType:
-                    sys.stderr.write(u'volume_size wrong, %s %s\n' % \
-                                         name, volume_size)
-                    sys.exit(1)
+                    raise Exception(u'volume_size wrong, %s %s' % \
+                                       name, volume_size)
         if (not instance_type) or (not volume_size):
             if description:
                 instance_info = description
             else:
                 instance_info = name
-            instance_info = u'%s:\n' % instance_info
-            sys.stdout.write(instance_info)
+            print(instance_info)
         if not instance_type:
             while True:
                 for instance_type in instance_types:
-                    sys.stdout.write('%s\n' % instance_type)
+                    print(instance_type)
                 prompt = u'select an instance type:'
                 instance_type = raw_input(prompt)
                 if instance_type in instance_types:

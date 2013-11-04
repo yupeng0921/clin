@@ -6,7 +6,7 @@ import sys
 import os
 import getopt
 import yaml
-from parsing_version_1 import deploy_version_1
+from parsing_version_1 import DeployVersion1
 
 def load_local_template_file(template_file):
     with open(template_file, 'r') as f:
@@ -108,8 +108,8 @@ def clin_deploy(argv):
     if u'Version' in template:
         v = template[u'Version']
         if v == 1:
-            deploy_version_1(template, stack_name, producter, parameter_file, \
-                                 use_default, debug, dump_parameter, conf_dir)
+            DeployVersion1(template, stack_name, producter, parameter_file, \
+                               use_default, debug, dump_parameter, conf_dir)
         else:
             sys.stderr.write(u'unsupport version: %s' % v)
             sys.exit(1)
