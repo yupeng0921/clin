@@ -2,6 +2,7 @@
 
 import sys
 import aws_operation
+import yaml
 
 producter_dict = {}
 producter_dict[u'aws'] = aws_operation.AwsOperation
@@ -11,37 +12,111 @@ def get_parameters(parameter_list, parameter_input_list):
 
 class Parameters():
     __parameter_dict = {}
-    def __init__(self, parameters, parameter_input_list):
-        self.get_parameters(parameters, parameter_input_list)
-    def get_parameters(self, parameters, parameter_input_list):
+    def __init__(self, parameters, input_parameter_dict, use_default):
+        self.__get_parameters(parameters, input_parameter_dict, use_default)
+
+    def __get_parameters(self, parameters, input_parameter_dict, use_default):
         for name in parameters:
             body = parameters[name]
             t = body[u'Type']
             if t == u'ParameterGroup':
-                prompt = u'%s:' % name
-                while True:
-                    inp = raw_input(prompt)
-                    if inp in (u'yes', u'Yes', u'YES', u'Y', u'y'):
-                        inp = True
-                        break
-                    elif inp in (u'no', u'No', u'NO', u'N', u'n'):
-                        inp = False
-                        break
+                enable = (u'yes', u'Yes', u'YES', u'Y', u'y')
+                disable = (u'no', u'No', u'NO', u'N', u'n')
+                if name in input_parameter_dict:
+                    inp = input_parameter_dict[name]
+                    if not inp in enable+disable:
+                        sys.stderr.write('invalid input, %s: %s\n' % (name, inp))
+                        sys.exit(1)
+                elif use_default:
+                    inp = body[u'Default']
+                    if not inp in enable+disable:
+                        sys.stderr.write('invalid input, %s: %s\n' % (name, inp))
+                        sys.exit(1)
+                else:
+                    prompt = u'%s:' % body[u'Description']
+                    while True:
+                        inp = raw_input(prompt)
+                        if inp in enable:
+                            inp = True
+                            break
+                        elif inp in disable:
+                            inp = False
+                            break
                 self.__parameter_dict[name] = inp
                 if inp:
-                    self.get_parameters(body[u'Members'], parameter_input_list)
+                    self.__get_parameters(body[u'Members'], input_parameter_dict, use_default)
             elif t == u'Parameter':
-                prompt = u'%s:' % name
-                inp = raw_input(prompt)
-                self.__parameter_dict[name] = inp
+                if name in input_parameter_dict:
+                    inp = input_parameter_dict[name]
+                    (ret, reason) = self.__verify_input(body, inp)
+                    if ret == False:
+                        sys.stderr.write(reason)
+                        sys.exit(1)
+                elif use_default:
+                    inp = body[u'Default']
+                    (ret, reason) = self.__verify_input(body, inp)
+                    if ret == False:
+                        sys.stderr.write(reason)
+                        sys.exit(1)
+                else:
+                    t = type(body[u'Default'])
+                    prompt = u'%s:' % body[u'Description']
+                    while True:
+                        inp = raw_input(prompt)
+                        try:
+                            inp = t(inp)
+                        except ValueError, e:
+                            sys.stdout.write(u'wrong input type, should be %s' % t)
+                            continue
+                        (ret, reason) = self.__verify_input(body, inp)
+                        if ret == False:
+                            sys.stdout.write(reason)
+                            continue
+                        else:
+                            break
+                    self.__parameter_dict[name] = inp
+
+    def __verify_input(self, body, inp):
+            if u'MinValue' in body:
+                if inp < body[u'MinValue']:
+                    reason = 'less than MinValue %s\n' % body[u'MinValue']
+                    return (False, reason)
+            if u'MaxValue' in body:
+                if inp > body[u'MaxValue']:
+                    reason = 'larger than MaxValue %s\n' % body[u'MaxValue']
+                    return (False, reason)
+            if u'AllowedValues' in body:
+                if not inp in body[u'AllowedValues']:
+                    reason = 'not in AllowedValues %s\n' % body[u'AllowedValues']
+                    return (False, reason)
+            return (True, None)
+
     def return_parameter_dict(self):
         return self.__parameter_dict
 
 def deploy_version_1(template, stack_name, producter, region, parameter_file, \
-                         use_default, debug, dump_parameter, parameter_input_list, instance_conf_input_list):
+                         use_default, debug, dump_parameter):
+    input_parameter_dict = {}
+    input_producter_dict = {}
+    if parameter_file:
+        p = yaml.safe_load(parameter_file)
+        if not u'Version' in p:
+            sys.stderr.write('parameter file has no version: %s\n', parameter_file)
+        elif p[u'Version'] != 1:
+            sys.stderr.write('version of parameter file is not 1: %s\n', parameter_file)
+        else:
+            if u'Parameters' in p:
+                for name in p[u'Parameters']:
+                    input_parameter_dict[name] = p[u'Parameters'][name]
+            if u'Instances' in p:
+                for producter in p:
+                    producter_parameter_dict = {}
+                    for parameter in p[producter]:
+                        producter_parameter_dict[parameter] = p[producter][parameter]
+                    input_producter_dict[producter] = producter_parameter_dict
 
     if u'Parameters' in template:
-        p = Parameters(template[u'Parameters'], parameter_input_list)
+        p = Parameters(template[u'Parameters'], input_parameter_dict, use_default)
         parameter_dict = p.return_parameter_dict()
         print parameter_dict
 

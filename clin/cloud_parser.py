@@ -39,7 +39,6 @@ def clin_deploy(argv):
         print(u'deploy_usage')
 
     long_params = [u'stack-name=', u'producter=', u'region=', \
-                       u'parameter=', u'instance-conf=', \
                        u'parameter-file=', u'dump-parameter=', \
                        u'yes', u'debug']
     try:
@@ -55,8 +54,6 @@ def clin_deploy(argv):
     use_default = False
     debug = False
     dump_parameter = u'no'
-    parameter_list = []
-    instance_conf_list = []
     for o, a in opts:
         if o == u'--stack-name':
             stack_name = a
@@ -68,34 +65,30 @@ def clin_deploy(argv):
             parameter_file = a
         elif o == u'-template-file':
             template_file = a
-        elif o == u'--parameter':
-            parameter_list.append(a)
-        elif o == u'--instance-conf':
-            instance_conf_list.append(a)
         elif o == u'--dump-parameter':
             if a in (u'no', u'yes', u'only'):
                 dump_parameter = a
             else:
-                sys.stdout.write(u'invalid dump-parameter: %s, should be no, yes, only' % a)
+                sys.stderr.write(u'invalid dump-parameter: %s, should be no, yes, only' % a)
                 sys.exit(1)
         elif o in (u'-y', '--yes'):
             use_default = True
         elif o == u'--debug':
             debug = True
         else:
-            sys.stdout.write(u'invalid args: %s %s' % (o, a))
+            sys.stderr.write(u'invalid args: %s %s' % (o, a))
             sys.exit(1)
 
     if len(args) != 1:
-        sys.stdout.write(u'should specific 1 and only 1 service name')
+        sys.stderr.write(u'should specific 1 and only 1 service name')
         for a in args:
-            sys.stdout.write(a)
+            sys.stderr.write(a)
         deploy_usage()
         sys.exit(1)
     service_name = args[0]
 
     if not stack_name:
-        sys.stdout.write(u'no stack name')
+        sys.stderr.write(u'no stack name')
         deploy_usage()
         sys.exit(1)
 
@@ -105,12 +98,12 @@ def clin_deploy(argv):
         v = template[u'Version']
         if v == 1:
             deploy_version_1(template, stack_name, producter, region, parameter_file, \
-                                 use_default, debug, dump_parameter, parameter_list, instance_conf_list)
+                                 use_default, debug, dump_parameter)
         else:
-            sys.stdout.write(u'unsupport version: %s' % unicode(v))
+            sys.stderr.write(u'unsupport version: %s' % v)
             sys.exit(1)
     else:
-        sys.stdout.write(u'should specific Version in template')
+        sys.stderr.write(u'should specific Version in template')
         sys.exit(1)
 
 @subcmd(u'describe')
