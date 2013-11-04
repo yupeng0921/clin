@@ -99,7 +99,7 @@ def deploy_version_1(template, stack_name, producter, region, parameter_file, \
     input_parameter_dict = {}
     input_producter_dict = {}
     if parameter_file:
-        p = yaml.safe_load(parameter_file)
+        p = yaml.safe_load(file(parameter_file))
         if not u'Version' in p:
             sys.stderr.write('parameter file has no version: %s\n', parameter_file)
         elif p[u'Version'] != 1:
@@ -109,10 +109,10 @@ def deploy_version_1(template, stack_name, producter, region, parameter_file, \
                 for name in p[u'Parameters']:
                     input_parameter_dict[name] = p[u'Parameters'][name]
             if u'Instances' in p:
-                for producter in p:
+                for producter in p[u'Instances']:
                     producter_parameter_dict = {}
-                    for parameter in p[producter]:
-                        producter_parameter_dict[parameter] = p[producter][parameter]
+                    for parameter in p[u'Instances'][producter]:
+                        producter_parameter_dict[parameter] = p[u'Instances'][producter][parameter]
                     input_producter_dict[producter] = producter_parameter_dict
 
     if u'Parameters' in template:
