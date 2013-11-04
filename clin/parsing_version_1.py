@@ -20,8 +20,8 @@ class Parameters():
             body = parameters[name]
             t = body[u'Type']
             if t == u'ParameterGroup':
-                enable = (u'yes', u'Yes', u'YES', u'Y', u'y')
-                disable = (u'no', u'No', u'NO', u'N', u'n')
+                enable = (u'yes', u'Yes', u'YES', u'Y', u'y', True)
+                disable = (u'no', u'No', u'NO', u'N', u'n', False)
                 if name in input_parameter_dict:
                     inp = input_parameter_dict[name]
                     if not inp in enable+disable:
@@ -74,7 +74,7 @@ class Parameters():
                             continue
                         else:
                             break
-                    self.__parameter_dict[name] = inp
+                self.__parameter_dict[name] = inp
 
     def __verify_input(self, body, inp):
             if u'MinValue' in body:
