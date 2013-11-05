@@ -1,5 +1,7 @@
 #! /usr/bin/env python
 
+# -*- coding: utf-8 -*-
+
 from cloud_operation import CloudOperation
 import os
 import sys
@@ -114,6 +116,7 @@ class AwsOperation(CloudOperation):
         self.__name_to_conf[name] = {u'instance_type': instance_type, u'volume_size':volume_size}
 
     def launch_instance(self, uuid, name, os_name, sg_rules):
+        return
         if not self.__key_pair:
             self.__create_keypair()
         conn = boto.ec2.connect_to_region(self.__region)
@@ -171,6 +174,7 @@ class AwsOperation(CloudOperation):
             conn.create_tags(instance_id, tags)
         self.__uuid_to_instance_id[uuid] = instance_id
     def wait_instance(self, uuid, timeout):
+        return
         conn = boto.ec2.connect_to_region(self.__region)
         instance_id = self.__uuid_to_instance_id[uuid]
         interval = 5

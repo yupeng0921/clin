@@ -1,5 +1,7 @@
 #! /usr/bin/env python
 
+# -*- coding: utf-8 -*-
+
 import sys
 import yaml
 import time
@@ -11,6 +13,7 @@ producter_dict[u'aws'] = aws_operation.AwsOperation
 class DeployVersion1():
     __parameter_dict = {}
     __uuid_dict = {}
+    __instance_name_list = []
     def __init__(self, template, stack_name, producter, region, parameter_file, \
                      use_default, debug, dump_parameter, conf_dir):
         input_parameter_dict = {}
@@ -87,6 +90,8 @@ class DeployVersion1():
             print(u'waiting resources')
             for uuid in self.__uuid_list:
                 op.wait_instance(uuid, 0)
+            self.__current_position = None
+            self.__config_instances(template[u'Resources'], stack_name, op)
 
     def __get_parameters(self, parameters, input_parameter_dict, use_default, disable):
         for name in parameters:
@@ -197,9 +202,38 @@ class DeployVersion1():
                 for i in range(0, number):
                     hierarchy1 = u'%s/%s:%d' % (hierarchy, name, i)
                     self.__uuid_list.append(hierarchy1)
+                    self.__instance_name_list.append(name)
                     op.launch_instance(hierarchy1, name, os_name, sg_rules)
             else:
                 raise Exception(u'Unknown type: %s' % t)
+
+    def __config_instances(self, groups, hierarchy, op):
+        for name in groups:
+            body = groups[name]
+            t = self.__interpret(body[u'Type'])
+            number = int(self.__interpret(body[u'Number']))
+            if t == u'InstanceGroup':
+                for i in range(0, number):
+                    hierarchy1 = u'%s/%s:%d' % (hierarchy, name, i)
+                    self.__config_instances(body[u'Members'], hierarchy1, op)
+            elif t == u'Instance':
+                for i in range(0, number):
+                    hierarchy1 = u'%s/%s:%d' % (hierarchy, name, i)
+                    self.__current_position = hierarchy1
+                    sg_rules = []
+                    properties = body[u'Properties']
+                    if u'SecurityGroupRules' in properties:
+                        for rule in properties[u'SecurityGroupRules']:
+                            sg_rules.append(self.__interpret(rule))
+                    if u'InitScript' in properties:
+                        init_script = self.__interpret(body[u'Properties'][u'InitScript'])
+                    init_parameters = []
+                    if u'InitParameters' in properties:
+                        for p in body[u'Properties'][u'InitParameters']:
+                            init_parameters.append(self.__interpret(p))
+                    print(sg_rules)
+                    print(init_script)
+                    print(init_parameters)
 
     def __interpret(self, expr):
         t = type(expr)
@@ -216,8 +250,33 @@ class DeployVersion1():
         l = expr.split(u'.')
         if l[0] == 'Parameter':
             return self.__parameter_dict[l[1]]
+        elif l[0] in self.__instance_name_list:
+            return self.__get_instance_attr(l)
         else:
             raise Exception(u'Unknown expr: %s' % expr)
+
+    def __get_instance_attr(self, l):
+        name = l[0]
+        attr = l[1]
+        head = self.__current_position.find(u'/')
+        position = self.__current_position[head:]
+        valid_uuid_list = []
+        if name in position:
+            h1 = position.find(name)
+            h2 = position[h1:].find(u'/')
+            prefix = position[0:h1+h2]
+            for uuid in self.__uuid_list:
+                if prefix == uuid[head:][0:h1+h2]:
+                    valid_uuid_list.append(uuid)
+        else:
+            for uuid in self.__uuid_list:
+                if name in uuid[head:]:
+                    valid_uuid_list.append(uuid)
+        ret = u''
+        for uuid in valid_uuid_list:
+            ret = u'%s %s %s ' % (ret, uuid, attr)
+        ret = ret.strip()
+        return ret
 
 class EraseVersion1():
     def __init__(self, stack_name, producter, region, conf_dir):
