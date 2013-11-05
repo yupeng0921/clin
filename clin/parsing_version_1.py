@@ -79,6 +79,9 @@ class DeployVersion1():
         if only_dump:
             return
 
+        if op:
+            self.__launch_group(template[u'Resources'], stack_name, op)
+
     def __get_parameters(self, parameters, input_parameter_dict, use_default, disable):
         for name in parameters:
             body = parameters[name]
@@ -168,6 +171,26 @@ class DeployVersion1():
             elif t == u'Instance':
                 description = self.__interpret(body['Description'])
                 op.get_instance_configure(name, description)
+            else:
+                raise Exception(u'Unknown type: %s' % t)
+
+    def __launch_group(self, groups, hierarchy, op):
+        for name in groups:
+            body = groups[name]
+            t = self.__interpret(body[u'Type'])
+            number = int(self.__interpret(body[u'Number']))
+            if t == u'InstanceGroup':
+                for i in range(0, number):
+                    hierarchy1 = u'%s/%s:%d' % (hierarchy, name, i)
+                    self.__launch_group(body[u'Members'], hierarchy1, op)
+            elif t == u'Instance':
+                os_name = self.__interpret(body[u'Properties'][u'OSName'])
+                sg_rules = []
+                for rule in body[u'Properties'][u'SecurityGroupRules']:
+                    sg_rules.append(self.__interpret(rule))
+                for i in range(0, number):
+                    hierarchy1 = u'%s/%s:%d' % (hierarchy, name, i)
+                    op.launch_instance(hierarchy1, name, os_name, sg_rules)
             else:
                 raise Exception(u'Unknown type: %s' % t)
 

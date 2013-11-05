@@ -5,6 +5,7 @@ import os
 import sys
 import time
 import types
+import yaml
 
 try:
     import boto.ec2
@@ -12,6 +13,9 @@ except ImportError, e:
     load_boto = False
 else:
     load_boto = True
+
+with open(u'aws_os_mapping.yml', u'r') as f:
+    os_mapping = yaml.safe_load(f)
 
 class AwsOperation(CloudOperation):
     __name_to_conf = {}
@@ -62,8 +66,8 @@ class AwsOperation(CloudOperation):
         stack_dir = u'%s/%s' % (region_dir, self.__stack_name)
         if os.path.exists(stack_dir):
             os.rename(stack_dir, u'%s_%s' % (stack_dir, time.time()))
-        os.mkdir(dir1)
-        self.__key_pair.save(u'%s/key.pem' % dir1)
+        os.mkdir(stack_dir)
+        self.__key_pair.save(stack_dir)
 
     def get_instance_configure(self, name, description):
         instance_types = [u't1.micro', u'm1.small', u'm1.medium', u'm1.large',
@@ -107,8 +111,60 @@ class AwsOperation(CloudOperation):
                     break
         self.__name_to_conf[name] = {u'instance_type': instance_type, u'volume_size':volume_size}
 
-    def launch_instance(self, uuid, name, os_name, security_group_rules):
-        pass
+    def launch_instance(self, uuid, name, os_name, sg_rules):
+        conn = self.__conn
+        if name not in self.__name_to_sg:
+            sg = conn.create_security_group(name, uuid)
+            self.__name_to_sg[name] = sg
+            for rule in sg_rules:
+                [ip_protocol, port, cidr_ip] = rule.split(u' ')
+                p = port.split(u'-')
+                if len(p) == 1:
+                    from_port = to_port = int(p[0])
+                elif len(p) == 2:
+                    from_port = int(p[0])
+                    to_port = int(p[1])
+                else:
+                    raise Exception(u'Invalid rule: %s' % rule)
+                retry = 5
+                while retry > 0:
+                    try:
+                        conn.authorize_security_group(name, ip_protocol = ip_protocol, \
+                                                          from_port = from_port, to_port = to_port, \
+                                                          cidr_ip = cidr_ip)
+                    except Exception, e:
+                        time.sleep(1)
+                    else:
+                        break
+                    retry -= 1
+                if retry == 0:
+                    conn.authorize_security_group(name, ip_protocol = ip_protocol, \
+                                                      from_port = from_port, to_port = to_port, \
+                                                      cidr_ip = cidr_ip)
+        else:
+            sg = self.__name_to_sg[name]
+
+        os_name = os_name.lower()
+        os_id = os_mapping[self.__region][os_name]
+        instance_type = self.__name_to_conf[name][u'instance_type']
+        volume_size = self.__name_to_conf[name][u'volume_size']
+        r = conn.run_instances(image_id=os_id, key_name = self.__key_pair.name, \
+                                   instance_type=instance_type, security_group_ids = [sg.id])
+        instance_id = r.instances[0].id
+        tags = {}
+        tags[u'Name'] = uuid
+        retry = 5
+        while retry > 0:
+            try:
+                conn.create_tags(instance_id, tags)
+            except Exception, e:
+                time.sleep(1)
+            else:
+                break
+            retry -= 1
+        if retry == 0:
+            conn.create_tags(instance_id, tags)
+        self.__uuid_to_instance_id[uuid] = instance_id
     def wait_instance(self, uuid):
         pass
     def get_public_ip(self, uuid):
