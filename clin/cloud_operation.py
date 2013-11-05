@@ -18,6 +18,9 @@ class CloudOperation():
     def launch_instance(self, uuid, name, os_name, security_group_rules):
         pass
     @abstractmethod
+    def set_instance_sg(self, uuid, sg_rules):
+        pass
+    @abstractmethod
     def wait_instance(self, uuid, timeout):
         pass
     @abstractmethod

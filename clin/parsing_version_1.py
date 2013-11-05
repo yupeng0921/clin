@@ -6,9 +6,12 @@ import sys
 import yaml
 import time
 import types
-import aws_operation
+
 producter_dict = {}
+import aws_operation
 producter_dict[u'aws'] = aws_operation.AwsOperation
+import pseudo
+producter_dict[u'pseudo'] = pseudo.PseudoOperation
 
 class DeployVersion1():
     __parameter_dict = {}
@@ -196,14 +199,11 @@ class DeployVersion1():
                     self.__launch_group(body[u'Members'], hierarchy1, op)
             elif t == u'Instance':
                 os_name = self.__interpret(body[u'Properties'][u'OSName'])
-                sg_rules = []
-                for rule in body[u'Properties'][u'SecurityGroupRules']:
-                    sg_rules.append(self.__interpret(rule))
                 for i in range(0, number):
                     hierarchy1 = u'%s/%s:%d' % (hierarchy, name, i)
                     self.__uuid_list.append(hierarchy1)
                     self.__instance_name_list.append(name)
-                    op.launch_instance(hierarchy1, name, os_name, sg_rules)
+                    op.launch_instance(hierarchy1, name, os_name)
             else:
                 raise Exception(u'Unknown type: %s' % t)
 

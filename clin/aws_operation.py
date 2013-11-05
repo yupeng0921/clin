@@ -24,6 +24,7 @@ class AwsOperation(CloudOperation):
     __name_to_conf = {}
     __name_to_sg = {}
     __uuid_to_instance_id = {}
+    __uuid_to_name = {}
     __sg_prefix = u'Security Group for '
     __key_pair = None
     def __init__(self, stack_name, conf_dir, only_dump, input_param_dict):
@@ -115,39 +116,13 @@ class AwsOperation(CloudOperation):
                     break
         self.__name_to_conf[name] = {u'instance_type': instance_type, u'volume_size':volume_size}
 
-    def launch_instance(self, uuid, name, os_name, sg_rules):
-        return
+    def launch_instance(self, uuid, name, os_name):
         if not self.__key_pair:
             self.__create_keypair()
         conn = boto.ec2.connect_to_region(self.__region)
         if name not in self.__name_to_sg:
             sg = conn.create_security_group(name, self.__sg_prefix + self.__stack_name)
             self.__name_to_sg[name] = sg
-            for rule in sg_rules:
-                [ip_protocol, port, cidr_ip] = rule.split(u' ')
-                p = port.split(u'-')
-                if len(p) == 1:
-                    from_port = to_port = int(p[0])
-                elif len(p) == 2:
-                    from_port = int(p[0])
-                    to_port = int(p[1])
-                else:
-                    raise Exception(u'Invalid rule: %s' % rule)
-                retry = 5
-                while retry > 0:
-                    try:
-                        conn.authorize_security_group(name, ip_protocol = ip_protocol, \
-                                                          from_port = from_port, to_port = to_port, \
-                                                          cidr_ip = cidr_ip)
-                    except Exception, e:
-                        time.sleep(1)
-                    else:
-                        break
-                    retry -= 1
-                if retry == 0:
-                    conn.authorize_security_group(name, ip_protocol = ip_protocol, \
-                                                      from_port = from_port, to_port = to_port, \
-                                                      cidr_ip = cidr_ip)
         else:
             sg = self.__name_to_sg[name]
 
@@ -173,6 +148,37 @@ class AwsOperation(CloudOperation):
         if retry == 0:
             conn.create_tags(instance_id, tags)
         self.__uuid_to_instance_id[uuid] = instance_id
+        self.__uuid_to_name[uuid] = name
+
+    def set_instance_sg(self, uuid, sg_rules):
+        name = self.__uuid_to_name[uuid]
+        conn = boto.ec2.connect_to_region(self.__region)
+        for rule in sg_rules:
+            [ip_protocol, port, cidr_ip] = rule.split(u' ')
+            p = port.split(u'-')
+            if len(p) == 1:
+                from_port = to_port = int(p[0])
+            elif len(p) == 2:
+                from_port = int(p[0])
+                to_port = int(p[1])
+            else:
+                raise Exception(u'Invalid rule: %s' % rule)
+            retry = 5
+            while retry > 0:
+                try:
+                    conn.authorize_security_group(name, ip_protocol = ip_protocol, \
+                                                      from_port = from_port, to_port = to_port, \
+                                                      cidr_ip = cidr_ip)
+                except Exception, e:
+                    time.sleep(1)
+                else:
+                    break
+                retry -= 1
+            if retry == 0:
+                conn.authorize_security_group(name, ip_protocol = ip_protocol, \
+                                                  from_port = from_port, to_port = to_port, \
+                                                  cidr_ip = cidr_ip)
+
     def wait_instance(self, uuid, timeout):
         return
         conn = boto.ec2.connect_to_region(self.__region)
