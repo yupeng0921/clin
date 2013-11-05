@@ -1,0 +1,16 @@
+us-east-1:
+  centos: ami-eb6b0182
+us-west-2:
+  centos: ami-b158c981
+us-west-1:
+  centos: ami-b9341afc
+eu-west-1:
+  centos: ami-230b1b57
+ap-southeast-1:
+  centos: ami-21682673
+ap-southeast-2:
+  centos: ami-83cd5eb9
+ap-northeast-1:
+  centos: ami-31e86030
+sa-east-1:
+  centos: ami-eacd68f7

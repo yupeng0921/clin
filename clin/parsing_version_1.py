@@ -10,7 +10,8 @@ producter_dict[u'aws'] = aws_operation.AwsOperation
 
 class DeployVersion1():
     __parameter_dict = {}
-    def __init__(self, template, stack_name, producter, parameter_file, \
+    __uuid_dict = {}
+    def __init__(self, template, stack_name, producter, region, parameter_file, \
                      use_default, debug, dump_parameter, conf_dir):
         input_parameter_dict = {}
         input_producter_dict = {}
@@ -60,7 +61,7 @@ class DeployVersion1():
             else:
                 input_param_dict = {}
             op = op_class(stack_name, conf_dir, only_dump, input_param_dict)
-            op.get_region()
+            op.get_region(region)
             self.__get_group_configure(template[u'Resources'], op)
 
         if dump_parameter in ('yes', 'only'):
@@ -80,7 +81,12 @@ class DeployVersion1():
             return
 
         if op:
+            self.__uuid_list = []
+            print(u'launching resources')
             self.__launch_group(template[u'Resources'], stack_name, op)
+            print(u'waiting resources')
+            for uuid in self.__uuid_list:
+                op.wait_instance(uuid, 0)
 
     def __get_parameters(self, parameters, input_parameter_dict, use_default, disable):
         for name in parameters:
@@ -190,6 +196,7 @@ class DeployVersion1():
                     sg_rules.append(self.__interpret(rule))
                 for i in range(0, number):
                     hierarchy1 = u'%s/%s:%d' % (hierarchy, name, i)
+                    self.__uuid_list.append(hierarchy1)
                     op.launch_instance(hierarchy1, name, os_name, sg_rules)
             else:
                 raise Exception(u'Unknown type: %s' % t)
@@ -211,3 +218,22 @@ class DeployVersion1():
             return self.__parameter_dict[l[1]]
         else:
             raise Exception(u'Unknown expr: %s' % expr)
+
+class EraseVersion1():
+    def __init__(self, stack_name, producter, region, conf_dir):
+        valid_producter = producter_dict.keys()
+        if producter:
+            if not producter in valid_producter:
+                raise Exception(u'invalid producter name: %s\nonly support: %s' % \
+                                    (producter, valid_producter))
+        else:
+            prompt = u'producter name:'
+            while True:
+                producter = raw_input(prompt)
+                if producter in valid_producter:
+                    break
+
+        op_class = producter_dict[producter]
+        op = op_class(stack_name, conf_dir, None, None)
+        op.get_region(region)
+        op.release_all_resources()

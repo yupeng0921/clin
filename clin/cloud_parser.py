@@ -6,7 +6,7 @@ import sys
 import os
 import getopt
 import yaml
-from parsing_version_1 import DeployVersion1
+from parsing_version_1 import DeployVersion1, EraseVersion1
 
 def load_local_template_file(template_file):
     with open(template_file, 'r') as f:
@@ -39,7 +39,7 @@ def clin_deploy(argv):
     def deploy_usage():
         print(u'deploy_usage')
 
-    long_params = [u'stack-name=', u'producter=', \
+    long_params = [u'stack-name=', u'producter=', u'region=', \
                        u'parameter-file=', u'dump-parameter=', \
                        u'yes', u'debug', u'conf-dir']
     try:
@@ -53,6 +53,7 @@ def clin_deploy(argv):
     region = None
     parameter_file = None
     conf_dir = None
+    region = None
     use_default = False
     debug = False
     dump_parameter = u'no'
@@ -61,17 +62,17 @@ def clin_deploy(argv):
             stack_name = a
         elif o == u'--producter':
             producter = a
-        elif o == u'--region':
-            producter = a
         elif o == u'--parameter-file':
             parameter_file = a
+        elif o == u'--region':
+            region = a
         elif o == u'-template-file':
             template_file = a
         elif o == u'--dump-parameter':
             if a in (u'no', u'yes', u'only'):
                 dump_parameter = a
             else:
-                sys.stderr.write(u'invalid dump-parameter: %s, should be no, yes, only' % a)
+                sys.stderr.write(u'invalid dump-parameter: %s, should be no, yes, only\n' % a)
                 sys.exit(1)
         elif o in (u'-y', '--yes'):
             use_default = True
@@ -80,13 +81,14 @@ def clin_deploy(argv):
         elif o == u'--debug':
             debug = True
         else:
-            sys.stderr.write(u'invalid args: %s %s' % (o, a))
+            sys.stderr.write(u'invalid args: %s %s\n' % (o, a))
             sys.exit(1)
 
     if len(args) != 1:
-        sys.stderr.write(u'should specific 1 and only 1 service name')
+        sys.stderr.write(u'should specific 1 and only 1 service name\n')
         for a in args:
             sys.stderr.write(a)
+            sys.stderr.write(u'\n')
         deploy_usage()
         sys.exit(1)
     service_name = args[0]
@@ -108,7 +110,7 @@ def clin_deploy(argv):
     if u'Version' in template:
         v = template[u'Version']
         if v == 1:
-            DeployVersion1(template, stack_name, producter, parameter_file, \
+            DeployVersion1(template, stack_name, producter, region, parameter_file, \
                                use_default, debug, dump_parameter, conf_dir)
         else:
             sys.stderr.write(u'unsupport version: %s' % v)
@@ -123,7 +125,47 @@ def clin_describe(argv):
 
 @subcmd(u'erase')
 def clin_erase(argv):
-    print(argv)
+
+    def erase_usage():
+        print(u'erase_usage')
+
+    long_params = [u'stack-name=', u'producter=', u'region=', u'conf-dir']
+    try:
+        opts, args = getopt.gnu_getopt(argv, u'', long_params)
+    except getopt.GetoptError, e:
+        erase_usage()
+        sys.exit(1)
+
+    stack_name = None
+    producter = None
+    region = None
+    conf_dir = None
+    for o, a in opts:
+        if o == u'--stack-name':
+            stack_name = a
+        elif o == u'--producter':
+            producter = a
+        elif o == u'--region':
+            region = a
+        elif o == u'--conf-dir':
+            conf_dir = a
+        else:
+            sys.stderr.write(u'invalid args: %s %s\n' % (o, a))
+            sys.exit(1)
+
+    if not stack_name:
+        sys.stderr.write(u'no stack name')
+        erase_usage()
+        sys.exit(1)
+
+    if not conf_dir:
+        if u'HOME' in os.environ:
+            conf_dir = os.environ['HOME']
+        else:
+            conf_dir = os.getcwd()
+    conf_dir = conf_dir + u'/.clin'
+
+    EraseVersion1(stack_name, producter, region, conf_dir)
 
 @subcmd(u'update')
 def clin_update(argv):
