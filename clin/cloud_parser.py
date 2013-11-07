@@ -12,10 +12,10 @@ def load_local_template_file(template_dir):
     template_file = u'%s/init.yml' % template_dir
     with open(template_file, 'r') as f:
         template = yaml.safe_load(f)
-    return template
+    return (template, template_dir)
 
 def load_remote_template_file(service_name):
-    return {}
+    return ()
 
 def load_template(service_name):
     local_flag = u'file://'
@@ -107,12 +107,12 @@ def clin_deploy(argv):
             conf_dir = os.getcwd()
     conf_dir = conf_dir + u'/.clin'
 
-    template = load_template(service_name)
+    template, template_dir = load_template(service_name)
 
     if u'Version' in template:
         v = template[u'Version']
         if v == 1:
-            DeployVersion1(template, stack_name, producter, region, parameter_file, \
+            DeployVersion1(template, template_dir, stack_name, producter, region, parameter_file, \
                                use_default, debug, dump_parameter, conf_dir)
         else:
             sys.stderr.write(u'unsupport version: %s' % v)

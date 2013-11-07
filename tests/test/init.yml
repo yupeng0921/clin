@@ -46,7 +46,7 @@ Resources:
         Description: primary instance in replica
         Number: 1
         OSName: centos
-      ReplicaSecondray:
+      ReplicaSecondary:
         Type: Instance
         Description: secondary instance in replica
         Number: SecondaryNumber

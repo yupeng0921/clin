@@ -6,6 +6,7 @@ import sys
 import yaml
 import time
 import types
+from jinja2 import Template, Environment, FileSystemLoader
 
 producter_dict = {}
 import aws_operation
@@ -13,11 +14,17 @@ producter_dict[u'aws'] = aws_operation.AwsOperation
 import pseudo
 producter_dict[u'pseudo'] = pseudo.PseudoOperation
 
+class Instance():
+    def __init__(self, uuid):
+        attrs = [u'private_ip', u'public_ip']
+        for attr in attrs:
+            self.__dict__[attr] = u'$$%s.%s$$' % (uuid, attr)
+
 class DeployVersion1():
     __parameter_dict = {}
     __uuid_dict = {}
     __instance_name_list = []
-    def __init__(self, template, stack_name, producter, region, parameter_file, \
+    def __init__(self, template, template_dir, stack_name, producter, region, parameter_file, \
                      use_default, debug, dump_parameter, conf_dir):
         input_parameter_dict = {}
         input_producter_dict = {}
@@ -88,14 +95,19 @@ class DeployVersion1():
 
         if op:
             self.__uuid_list = []
+            self.__render_dict = {}
             print(u'launching resources')
             self.__launch_group(template[u'Resources'], stack_name, op)
             print(u'waiting resources')
             for uuid in self.__uuid_list:
                 op.wait_instance(uuid, 0)
             self.__current_position = None
+            self.__template_dir = template_dir
             self.__op = op
-            # self.__config_instances(template[u'Resources'], stack_name, op)
+            self.__render_dict = dict(self.__render_dict, **self.__parameter_dict)
+            loader = FileSystemLoader(template_dir)
+            self.__env = Environment(loader = loader)
+            self.__init_instances(template[u'Resources'], stack_name, op)
 
     def __get_parameters(self, parameters, input_parameter_dict, use_default, disable):
         for name in parameters:
@@ -206,11 +218,14 @@ class DeployVersion1():
                     hierarchy1 = u'%s/%s:%d' % (hierarchy, name, i)
                     self.__uuid_list.append(hierarchy1)
                     self.__instance_name_list.append(name)
+                    if name not in self.__render_dict:
+                        self.__render_dict[name] = []
+                    self.__render_dict[name].append(Instance(hierarchy1))
                     op.launch_instance(hierarchy1, name, os_name)
             else:
                 raise Exception(u'Unknown type: %s' % t)
 
-    def __config_instances(self, groups, hierarchy, op):
+    def __init_instances(self, groups, hierarchy, op):
         for name in groups:
             body = groups[name]
             t = body[u'Type']
@@ -218,12 +233,13 @@ class DeployVersion1():
             if t == u'InstanceGroup':
                 for i in range(0, number):
                     hierarchy1 = u'%s/%s:%d' % (hierarchy, name, i)
-                    self.__config_instances(body[u'Members'], hierarchy1, op)
+                    self.__init_instances(body[u'Members'], hierarchy1, op)
             elif t == u'Instance':
+                t = self.__env.get_template(u'%s/init.yml' % name)
+                r = t.render(**self.__render_dict)
+                c = yaml.safe_load(r)
                 for i in range(0, number):
                     hierarchy1 = u'%s/%s:%d' % (hierarchy, name, i)
-                    self.__current_position = hierarchy1
-                    print(hierarchy1)
 
     def __get_number(self, number):
         t = type(number)
