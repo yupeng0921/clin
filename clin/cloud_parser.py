@@ -8,7 +8,8 @@ import getopt
 import yaml
 from parsing_version_1 import DeployVersion1, EraseVersion1
 
-def load_local_template_file(template_file):
+def load_local_template_file(template_dir):
+    template_file = u'%s/init.yml' % template_dir
     with open(template_file, 'r') as f:
         template = yaml.safe_load(f)
     return template
@@ -23,6 +24,7 @@ def load_template(service_name):
         return load_local_template_file(service_name[length:])
     else:
         return load_remote_template_file(service_name)
+
 sub_commands = {}
 def subcmd(name):
     def _subcmd(func):

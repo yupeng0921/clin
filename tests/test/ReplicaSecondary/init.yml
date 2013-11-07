@@ -1,0 +1,9 @@
+SecurityGroupRules:
+  {% for ins in ReplicaPrimary %}
+  - tcp 7000 {{ ins.private_ip }}
+  {% endfor %}
+
+InitParameters:
+  {% for ins in ReplicaPrimary %}
+  - {{ ins.private_ip }}
+  {% endfor %}

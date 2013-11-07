@@ -1,0 +1,25 @@
+SecurityGroupRules:
+  - tcp 7000 {{ ClientCidr }}
+  {% for ins in ConfigInstance %}
+  - tcp 7000 {{ ins.private_ip }}
+  {% endfor %}
+  {% for ins in ReplicaPrimary %}
+  - tcp 7000 {{ ins.private_ip }}
+  {% endfor %}
+  {% for ins in RouterInstance %}
+  - tcp 7000 {{ ins.private_ip }}
+  {% endfor %}
+
+InitParameters:
+  - {{ RouterNumber }}
+  {% for ins in RouterInstance %}
+  - {{ ins.private_ip }}
+  {% endfor %}
+  - {{ ConfigNumber }}
+  {% for ins in ConfigInstance %}
+  - {{ ins.private_ip }}
+  {% endfor %}
+  - {{ SharedNumber }}
+  {% for ins in ReplicaPrimary %}
+  - {{ ins.private_ip }}
+  {% endfor %}

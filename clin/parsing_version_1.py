@@ -94,7 +94,8 @@ class DeployVersion1():
             for uuid in self.__uuid_list:
                 op.wait_instance(uuid, 0)
             self.__current_position = None
-            self.__config_instances(template[u'Resources'], stack_name, op)
+            self.__op = op
+            # self.__config_instances(template[u'Resources'], stack_name, op)
 
     def __get_parameters(self, parameters, input_parameter_dict, use_default, disable):
         for name in parameters:
@@ -125,8 +126,10 @@ class DeployVersion1():
                             break
                 self.__parameter_dict[name] = inp
                 if not inp:
-                    disable = True
-                self.__get_parameters(body[u'Members'], input_parameter_dict, use_default, disable)
+                    self.__get_parameters(body[u'Members'], input_parameter_dict, use_default, True)
+                else:
+                    self.__get_parameters(body[u'Members'], input_parameter_dict, use_default, False)
+                
             elif t == u'Parameter':
                 if disable:
                     inp = body[u'DisableValue']
@@ -152,7 +155,7 @@ class DeployVersion1():
                             continue
                         (ret, reason) = self.__verify_input(body, inp)
                         if ret == False:
-                            printf(reason)
+                            print(reason)
                             continue
                         else:
                             break
@@ -176,14 +179,14 @@ class DeployVersion1():
     def __get_group_configure(self, groups, op):
         for name in groups:
             body = groups[name]
-            t = self.__interpret(body[u'Type'])
-            number = self.__interpret(body[u'Number'])
+            t = body[u'Type']
+            number = self.__get_number(body[u'Number'])
             if number <= 0:
                 continue
             if t == u'InstanceGroup':
                 self.__get_group_configure(body[u'Members'], op)
             elif t == u'Instance':
-                description = self.__interpret(body['Description'])
+                description = body['Description']
                 op.get_instance_configure(name, description)
             else:
                 raise Exception(u'Unknown type: %s' % t)
@@ -191,14 +194,14 @@ class DeployVersion1():
     def __launch_group(self, groups, hierarchy, op):
         for name in groups:
             body = groups[name]
-            t = self.__interpret(body[u'Type'])
-            number = int(self.__interpret(body[u'Number']))
+            t = body[u'Type']
+            number = self.__get_number(body[u'Number'])
             if t == u'InstanceGroup':
                 for i in range(0, number):
                     hierarchy1 = u'%s/%s:%d' % (hierarchy, name, i)
                     self.__launch_group(body[u'Members'], hierarchy1, op)
             elif t == u'Instance':
-                os_name = self.__interpret(body[u'Properties'][u'OSName'])
+                os_name = body[u'OSName']
                 for i in range(0, number):
                     hierarchy1 = u'%s/%s:%d' % (hierarchy, name, i)
                     self.__uuid_list.append(hierarchy1)
@@ -210,8 +213,8 @@ class DeployVersion1():
     def __config_instances(self, groups, hierarchy, op):
         for name in groups:
             body = groups[name]
-            t = self.__interpret(body[u'Type'])
-            number = int(self.__interpret(body[u'Number']))
+            t = body[u'Type']
+            number = self.__get_number(body[u'Number'])
             if t == u'InstanceGroup':
                 for i in range(0, number):
                     hierarchy1 = u'%s/%s:%d' % (hierarchy, name, i)
@@ -220,40 +223,21 @@ class DeployVersion1():
                 for i in range(0, number):
                     hierarchy1 = u'%s/%s:%d' % (hierarchy, name, i)
                     self.__current_position = hierarchy1
-                    sg_rules = []
-                    properties = body[u'Properties']
-                    if u'SecurityGroupRules' in properties:
-                        for rule in properties[u'SecurityGroupRules']:
-                            sg_rules.append(self.__interpret(rule))
-                    if u'InitScript' in properties:
-                        init_script = self.__interpret(body[u'Properties'][u'InitScript'])
-                    init_parameters = []
-                    if u'InitParameters' in properties:
-                        for p in body[u'Properties'][u'InitParameters']:
-                            init_parameters.append(self.__interpret(p))
-                    print(sg_rules)
-                    print(init_script)
-                    print(init_parameters)
+                    print(hierarchy1)
 
-    def __interpret(self, expr):
-        t = type(expr)
-        if (t is types.UnicodeType) or (t is types.StringType):
-            if expr[0:2] == u'$$' and expr[-2:] == u'$$':
-                expr = expr[2:-2]
-                return self.__run_buildin_func(expr)
+    def __get_number(self, number):
+        t = type(number)
+        if t is not types.IntType:
+            if t is types.StringType or t is types.UnicodeType:
+                if number in self.__parameter_dict:
+                    number = self.__parameter_dict[number]
+                    if type(number) is not types.IntType:
+                        raise Exception(u'Unsupport number type: %s %s' % (number, type(number)))
+                else:
+                    raise Exception(u'Unknown number: %s' % number)
             else:
-                return expr
-        else:
-            return expr
-
-    def __run_buildin_func(self, expr):
-        l = expr.split(u'.')
-        if l[0] == 'Parameter':
-            return self.__parameter_dict[l[1]]
-        elif l[0] in self.__instance_name_list:
-            return self.__get_instance_attr(l)
-        else:
-            raise Exception(u'Unknown expr: %s' % expr)
+                raise Exception(u'Unsupport number type: %s %s' % (number, t))
+        return number
 
     def __get_instance_attr(self, l):
         name = l[0]
@@ -272,9 +256,18 @@ class DeployVersion1():
             for uuid in self.__uuid_list:
                 if name in uuid[head:]:
                     valid_uuid_list.append(uuid)
+
+        if attr == u'private_ip':
+            func = self.__op.get_private_ip
+        elif attr == u'public_ip':
+            func = self.__op.get_public_ip
+        else:
+            raise Exception(u'Unknown attr: %s' % attr)
+
         ret = u''
         for uuid in valid_uuid_list:
-            ret = u'%s %s %s ' % (ret, uuid, attr)
+            val = func(uuid)
+            ret = u'%s %s %s ' % (ret, uuid, val)
         ret = ret.strip()
         return ret
 

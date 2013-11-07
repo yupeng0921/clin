@@ -1,0 +1,20 @@
+SecurityGroupRules:
+  {% for ins in ConfigInstance %}
+  - tcp 7000 {{ ConfigInstance.private_ip }}
+  {% endfor %}
+  {% for ins in RouterInstance %}
+  - tcp 7000 {{ ins.private_ip }}
+  {% endfor %}
+  {% for ins in ReplicaSecondray %}
+  - tcp 7000 {{ ins.private_ip }}
+  {% endfor %}
+
+InitParameters:
+  - {{ SecondaryNumber }}
+  {% for ins in ReplicaSecondray %}
+  - {{ ins.private_ip }}
+  {% endfor %}
+  - {{ ConfigNumber }}
+  {% for ins in ConfigInstance %}
+  - {{ ins.private_ip}}
+  {% endfor %}

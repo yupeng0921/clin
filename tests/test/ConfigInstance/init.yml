@@ -1,0 +1,9 @@
+SecurityGroupRules:
+  {% for ins in RouterInstance %}
+  - tcp 7000 {{ ins.private_ip %}
+  {% endfor %}
+
+Initparameters:
+  - {{ SharedNumber }}
+  {% for ins in ReplicaPrimary %}
+  - {{ ins.private_ip }}

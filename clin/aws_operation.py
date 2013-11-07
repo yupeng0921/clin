@@ -17,9 +17,6 @@ except ImportError, e:
 else:
     load_boto = True
 
-with open(u'aws_os_mapping.yml', u'r') as f:
-    os_mapping = yaml.safe_load(f)
-
 class AwsOperation(CloudOperation):
     __name_to_conf = {}
     __name_to_sg = {}
@@ -35,6 +32,8 @@ class AwsOperation(CloudOperation):
         self.__conf_dir = conf_dir
         self.__only_dump = only_dump
         self.__input_param_dict = input_param_dict
+        with open(u'%s/aws_os_mapping.yml' % os.path.dirname(__file__), u'r') as f:
+            self.__os_mapping = yaml.safe_load(f)
 
     def get_region(self, input_region):
         regions = [u'us-east-1', u'us-west-1', u'us-west-2', \
@@ -127,7 +126,7 @@ class AwsOperation(CloudOperation):
             sg = self.__name_to_sg[name]
 
         os_name = os_name.lower()
-        os_id = os_mapping[self.__region][os_name]
+        os_id = self.__os_mapping[self.__region][os_name]
         instance_type = self.__name_to_conf[name][u'instance_type']
         volume_size = self.__name_to_conf[name][u'volume_size']
         r = conn.run_instances(image_id=os_id, key_name = self.__key_pair.name, \
