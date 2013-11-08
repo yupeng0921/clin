@@ -3,7 +3,7 @@ SecurityGroupRules:
   - tcp 7000 {{ ins.private_ip }}
   {% endfor %}
 
-Initparameters:
+InitParameters:
   - {{ SharedNumber }}
   {% for ins in ReplicaPrimary %}
   - {{ ins.private_ip }}

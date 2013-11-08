@@ -3,6 +3,7 @@
 # -*- coding: utf-8 -*-
 
 import sys
+import os
 import yaml
 import time
 import types
@@ -106,7 +107,9 @@ class DeployVersion1():
             self.__op = op
             self.__render_dict = dict(self.__render_dict, **self.__parameter_dict)
             loader = FileSystemLoader(template_dir)
+            self.__template_dir = template_dir
             self.__env = Environment(loader = loader)
+            print(u'initing instances')
             self.__init_instances(template[u'Resources'], stack_name, op)
 
     def __get_parameters(self, parameters, input_parameter_dict, use_default, disable):
@@ -235,11 +238,35 @@ class DeployVersion1():
                     hierarchy1 = u'%s/%s:%d' % (hierarchy, name, i)
                     self.__init_instances(body[u'Members'], hierarchy1, op)
             elif t == u'Instance':
+                init_file = u'%s/%s/init.yml' % (self.__template_dir, name)
+                if not os.path.exists(init_file):
+                    continue
                 t = self.__env.get_template(u'%s/init.yml' % name)
                 r = t.render(**self.__render_dict)
                 c = yaml.safe_load(r)
                 for i in range(0, number):
                     hierarchy1 = u'%s/%s:%d' % (hierarchy, name, i)
+                    self.__current_position = hierarchy1
+                    self.__op = op
+                    sg_rules = []
+                    for rule in c[u'SecurityGroupRules']:
+                        rule = self.__explain(rule)
+                        if rule:
+                            sg_rules.append(rule)
+                    init_parameters = []
+                    for param in c[u'InitParameters']:
+                        param = self.__explain(param)
+                        if param:
+                            init_parameters.append(param)
+
+                    print(hierarchy1)
+                    print(u'rules:')
+                    for rule in sg_rules:
+                        print(rule)
+                    print(u'params:')
+                    for p in init_parameters:
+                        print(p)
+                    print(u'')
 
     def __get_number(self, number):
         t = type(number)
@@ -255,37 +282,85 @@ class DeployVersion1():
                 raise Exception(u'Unsupport number type: %s %s' % (number, t))
         return number
 
-    def __get_instance_attr(self, l):
-        name = l[0]
-        attr = l[1]
-        head = self.__current_position.find(u'/')
-        position = self.__current_position[head:]
-        valid_uuid_list = []
-        if name in position:
-            h1 = position.find(name)
-            h2 = position[h1:].find(u'/')
-            prefix = position[0:h1+h2]
-            for uuid in self.__uuid_list:
-                if prefix == uuid[head:][0:h1+h2]:
-                    valid_uuid_list.append(uuid)
+    def __explain(self, param):
+        if type(param) is not types.StringType and type(param) is not types.UnicodeType:
+            return param
+        flag = u'$$'
+        flag_len = len(flag)
+        h1 = param.find(flag)
+        if h1 == -1:
+            return param
+        p1 = param[h1+flag_len:]
+        h2 = p1.find(flag)
+        if h2 == -1:
+            raise Exception(u'Invalid param: %s' % param)
+        p2 = p1[0:h2]
+        ret = self.__get_attr(p2)
+        if ret:
+            after_explain = u'%s%s%s' % (param[0:h1], ret, param[h1+flag_len+h2+flag_len:])
+            ret1 = self.__explain(after_explain)
+            return ret1
         else:
-            for uuid in self.__uuid_list:
-                if name in uuid[head:]:
-                    valid_uuid_list.append(uuid)
+            return None
 
-        if attr == u'private_ip':
-            func = self.__op.get_private_ip
-        elif attr == u'public_ip':
-            func = self.__op.get_public_ip
+    def __get_attr(self, param):
+        # assume the stack name is aa
+        # the instance uuid in param maybe:
+        # 1 aa/bb:0/cc:0/dd:0
+        # 2 aa/bb:0/cc:0/dd:1
+        # 3 aa/bb:0/cc:1/dd:0
+        # 4 aa/bb:0/cc:1/dd:1
+        # 5 aa/bb:1/cc:0/dd:0
+        # 6 aa/bb:1/cc:0/dd:1
+        # 7 aa/bb:1/cc:1/dd:0
+        # 8 aa/bb:1/cc:1/dd:1
+        # if the current uuid is aa/xx:1
+        # it will accept 1-8
+        # if the current uuid is aa/bb:1/cc:0/ee:1
+        # it will accept 5-6
+        # if the current uuuid is aa/bb:0/mm:0/nn:1
+        # it will accept 1-4
+
+        (uuid, attr) = param.split(u'.')
+        ori_uuid = uuid
+        uuid = uuid.split(u'/')[1:]
+        current = self.__current_position.split(u'/')[1:]
+        len_u = len(uuid) - 1
+        len_c = len(current) - 1
+        if len_u > len_c:
+            len_min = len_c
         else:
-            raise Exception(u'Unknown attr: %s' % attr)
+            len_min = len_u
+        approve = None
+        if len_min == 0:
+            approve = True
+        else:
+            root_c = current[0].split(u':')[0]
+            root_u = uuid[0].split(u':')[0]
+            if root_c != root_u:
+                approve = True
+            else:
+                for i in range(0, len_min):
+                    if current[i] != uuid[i]:
+                        name_c = current[i].split(u':')[0]
+                        name_u = uuid[i].split(u':')[0]
+                        if name_c == name_u:
+                            approve = False
+                        else:
+                            approve = True
+                        break
+                if approve == None:
+                    approve = True
 
-        ret = u''
-        for uuid in valid_uuid_list:
-            val = func(uuid)
-            ret = u'%s %s %s ' % (ret, uuid, val)
-        ret = ret.strip()
-        return ret
+        if approve:
+            if attr == u'private_ip':
+                return self.__op.get_private_ip(ori_uuid)
+            elif attr == u'public_ip':
+                return self.__op.get_public_ip(ori_uuid)
+            else:
+                raise Exception(u'Unknown attr: %s' % atr)
+        else:
+            return None
 
 class EraseVersion1():
     def __init__(self, stack_name, producter, region, conf_dir):
