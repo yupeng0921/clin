@@ -23,6 +23,16 @@ class Instance():
         for attr in attrs:
             self.__dict__[attr] = u'$$%s.%s$$' % (uuid, attr)
 
+class RunInit():
+    def __init__(self, uuid, name, hostname, username, key_filename, depends, parameters):
+        self.uuid = uuid
+        self.name = name
+        self.hostname = hostname
+        self.username = username
+        self.key_filename = key_filename
+        self.depends = depends
+        self.parameters = parameters
+
 class DeployVersion1():
     __parameter_dict = {}
     __uuid_dict = {}
@@ -112,7 +122,40 @@ class DeployVersion1():
             self.__template_dir = template_dir
             self.__env = Environment(loader = loader)
             print(u'initing instances')
+            self.__not_init = {}
+            self.__already_init = []
             self.__init_instances(template[u'Resources'], stack_name, op)
+            while len(self.__not_init) > 0:
+                tmp_list = []
+                for name in self.__not_init:
+                    for run_init in self.__not_init[name]:
+                        if run_init.depends:
+                            can_run = True
+                            for dep in run_init.depends:
+                                if dep not in self.__already_init:
+                                    can_run = False
+                                    break
+                            if not can_run:
+                                break
+                        ssh=paramiko.SSHClient()
+                        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                        hostname = run_init.hostname
+                        username = run_init.username
+                        key_filename = run_init.key_filename
+                        cmd = u'bash ~/%s/init.sh' % run_init.name
+                        if username != u'root':
+                            cmd = u'sudo %s' % cmd
+                        for p in run_init.parameters:
+                            cmd = u'%s %s' % (cmd, p)
+                        ssh.connect(hostname=hostname, username=username, key_filename=key_filename)
+                        ssh.exec_command(cmd)
+                        ssh.close()
+                    tmp_list.append(name)
+                if not tmp_list:
+                    raise Exception('can not init any more')
+                for name in tmp_list:
+                    del(self.__not_init[name])
+                    self.__already_init.append(name)
 
     def __get_parameters(self, parameters, input_parameter_dict, use_default, disable):
         for name in parameters:
@@ -267,9 +310,6 @@ class DeployVersion1():
                     op.open_ssh(hierarchy1)
                     ssh=paramiko.SSHClient()
                     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                    print(hostname)
-                    print(username)
-                    print(key_filename)
                     retry = 3
                     while retry > 0:
                         try:
@@ -280,6 +320,9 @@ class DeployVersion1():
                             break
                         retry -= 1
                     if retry == 0:
+                        print(u'hostname=%s' % hostname)
+                        print(u'username=%s' % username)
+                        print(u'key_filename=%s' % key_filename)
                         ssh.connect(hostname=hostname, username=username, key_filename=key_filename)
                     scopy = scp.SCPClient(ssh.get_transport())
                     src = u'%s/%s' % (self.__template_dir, name)
@@ -287,6 +330,10 @@ class DeployVersion1():
                     scopy.put(src, dst, True)
                     ssh.close()
                     op.close_ssh(hierarchy1)
+                    run_init = RunInit(hierarchy1, name, hostname, username, key_filename, None, init_parameters)
+                    if name not in self.__not_init:
+                        self.__not_init[name] = []
+                    self.__not_init[name].append(run_init)
 
     def __get_number(self, number):
         t = type(number)
