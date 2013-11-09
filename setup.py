@@ -1,30 +1,16 @@
 #! /usr/bin/env python
 
 from setuptools import setup, find_packages
+import clin
 
-PACKAGE = 'clin'
-NAME = 'clin'
-KEYWORDS = ('cloud', 'aws', 'openstack')
-VERSION = __import__(PACKAGE).__version__
-DESCRIPTION = 'deploy service on cloud platform'
-LICENSE = 'GPL'
-URL = ''
-AUTHOR = 'yupeng'
-AUTHOR_EMAIL = 'yupeng0921@gmail.com'
-
-setup(
-    name = NAME,
-    version = VERSION,
-    keywords = KEYWORDS,
-    description = DESCRIPTION,
-    license = LICENSE,
-
-    url = URL,
-    author = AUTHOR,
-    author_email = AUTHOR_EMAIL,
-
+setup_options = dict(
+    name = 'clin',
+    version = clin.__version__,
     scripts = ['bin/clin'],
-    packages = find_packages(),
-    include_package_data = True,
+    packages=find_packages('.', exclude=['tests*']),
+    package_dir={'clin':'clin'},
+    package_data={'clin': ['data/*.yml']},
     platforms = '*nix',
     )
+
+setup(**setup_options)

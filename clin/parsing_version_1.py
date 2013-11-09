@@ -310,7 +310,7 @@ class DeployVersion1():
                     op.open_ssh(hierarchy1)
                     ssh=paramiko.SSHClient()
                     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                    retry = 3
+                    retry = 10
                     while retry > 0:
                         try:
                             ssh.connect(hostname=hostname, username=username, key_filename=key_filename)

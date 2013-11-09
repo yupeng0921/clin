@@ -33,7 +33,7 @@ class AwsOperation(CloudOperation):
         self.__conf_dir = conf_dir
         self.__only_dump = only_dump
         self.__input_param_dict = input_param_dict
-        with open(u'%s/aws_os_mapping.yml' % os.path.dirname(__file__), u'r') as f:
+        with open(u'%s/data/aws_os_mapping.yml' % os.path.dirname(__file__), u'r') as f:
             self.__os_mapping = yaml.safe_load(f)
 
     def get_region(self, input_region):
