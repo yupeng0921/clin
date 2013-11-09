@@ -4,7 +4,7 @@ Parameters:
   EnableShare:
     Description: enable share
     Type: ParameterGroup
-    Default: True
+    Default: False
     Members:
       SharedNumber:
         Description: number of share group

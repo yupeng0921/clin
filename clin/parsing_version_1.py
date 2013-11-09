@@ -8,6 +8,8 @@ import yaml
 import time
 import types
 from jinja2 import Template, Environment, FileSystemLoader
+import paramiko
+import scp
 
 producter_dict = {}
 import aws_operation
@@ -253,20 +255,38 @@ class DeployVersion1():
                         rule = self.__explain(rule)
                         if rule:
                             sg_rules.append(rule)
+                    sg_rules.append(u'tcp 22 0.0.0.0/0')
                     init_parameters = []
                     for param in c[u'InitParameters']:
                         param = self.__explain(param)
                         if param:
                             init_parameters.append(param)
-
-                    print(hierarchy1)
-                    print(u'rules:')
-                    for rule in sg_rules:
-                        print(rule)
-                    print(u'params:')
-                    for p in init_parameters:
-                        print(p)
-                    print(u'')
+                    op.set_instance_sg(hierarchy1, sg_rules)
+                    username, key_filename = op.get_login_user(hierarchy1)
+                    hostname = op.get_public_ip(hierarchy1)
+                    op.open_ssh(hierarchy1)
+                    ssh=paramiko.SSHClient()
+                    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                    print(hostname)
+                    print(username)
+                    print(key_filename)
+                    retry = 3
+                    while retry > 0:
+                        try:
+                            ssh.connect(hostname=hostname, username=username, key_filename=key_filename)
+                        except Exception, e:
+                            time.sleep(1)
+                        else:
+                            break
+                        retry -= 1
+                    if retry == 0:
+                        ssh.connect(hostname=hostname, username=username, key_filename=key_filename)
+                    scopy = scp.SCPClient(ssh.get_transport())
+                    src = u'%s/%s' % (self.__template_dir, name)
+                    dst = u'~/'
+                    scopy.put(src, dst, True)
+                    ssh.close()
+                    op.close_ssh(hierarchy1)
 
     def __get_number(self, number):
         t = type(number)

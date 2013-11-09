@@ -1,13 +1,13 @@
 SecurityGroupRules:
   - tcp 7000 {{ ClientCidr }}
   {% for ins in ConfigInstance %}
-  - tcp 7000 {{ ins.private_ip }}
+  - tcp 7000 {{ ins.private_ip }}/32
   {% endfor %}
   {% for ins in ReplicaPrimary %}
-  - tcp 7000 {{ ins.private_ip }}
+  - tcp 7000 {{ ins.private_ip }}/32
   {% endfor %}
   {% for ins in RouterInstance %}
-  - tcp 7000 {{ ins.private_ip }}
+  - tcp 7000 {{ ins.private_ip }}/32
   {% endfor %}
 
 InitParameters:

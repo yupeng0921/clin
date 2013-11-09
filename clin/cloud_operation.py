@@ -24,10 +24,19 @@ class CloudOperation():
     def wait_instance(self, uuid, timeout):
         pass
     @abstractmethod
+    def get_login_user(self, uuid):
+        pass
+    @abstractmethod
     def get_public_ip(self, uuid):
         pass
     @abstractmethod
     def get_private_ip(self, uuid):
+        pass
+    @abstractmethod
+    def open_ssh(self, uuid):
+        pass
+    @abstractmethod
+    def close_ssh(self, uuid):
         pass
     @abstractmethod
     def terminate_instance(self, uuid):
