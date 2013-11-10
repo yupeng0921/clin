@@ -20,7 +20,7 @@ class PseudoOperation():
         print(u'')
 
     def wait_instance(self, uuid, timeout):
-        print(u'waint instance:')
+        print(u'wait instance:')
         print(uuid)
         print(timeout)
 

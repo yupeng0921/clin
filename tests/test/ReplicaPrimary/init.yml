@@ -18,3 +18,8 @@ InitParameters:
   {% for ins in ConfigInstance %}
   - {{ ins.private_ip}}
   {% endfor %}
+
+Depends:
+  {% for ins in ReplicaSecondary %}
+  - {{ ins.uuid }}
+  {% endfor %}

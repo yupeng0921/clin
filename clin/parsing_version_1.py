@@ -19,7 +19,7 @@ producter_dict[u'pseudo'] = pseudo.PseudoOperation
 
 class Instance():
     def __init__(self, uuid):
-        attrs = [u'private_ip', u'public_ip']
+        attrs = [u'private_ip', u'public_ip', u'uuid']
         for attr in attrs:
             self.__dict__[attr] = u'$$%s.%s$$' % (uuid, attr)
 
@@ -122,21 +122,19 @@ class DeployVersion1():
             self.__template_dir = template_dir
             self.__env = Environment(loader = loader)
             print(u'initing instances')
-            self.__not_init = {}
+            self.__not_init = []
             self.__already_init = []
             self.__init_instances(template[u'Resources'], stack_name, op)
             while len(self.__not_init) > 0:
                 tmp_list = []
-                for name in self.__not_init:
-                    for run_init in self.__not_init[name]:
-                        if run_init.depends:
-                            can_run = True
-                            for dep in run_init.depends:
-                                if dep not in self.__already_init:
-                                    can_run = False
-                                    break
-                            if not can_run:
+                for run_init in self.__not_init:
+                    can_run = True
+                    if run_init.depends:
+                        for dep in run_init.depends:
+                            if dep not in self.__already_init:
+                                can_run = False
                                 break
+                    if can_run:
                         ssh=paramiko.SSHClient()
                         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
                         hostname = run_init.hostname
@@ -150,12 +148,12 @@ class DeployVersion1():
                         ssh.connect(hostname=hostname, username=username, key_filename=key_filename)
                         ssh.exec_command(cmd)
                         ssh.close()
-                    tmp_list.append(name)
+                        self.__already_init.append(run_init.uuid)
+                        tmp_list.append(run_init)
                 if not tmp_list:
                     raise Exception('can not init any more')
-                for name in tmp_list:
-                    del(self.__not_init[name])
-                    self.__already_init.append(name)
+                for run_init in tmp_list:
+                    self.__not_init.remove(run_init)
 
     def __get_parameters(self, parameters, input_parameter_dict, use_default, disable):
         for name in parameters:
@@ -294,16 +292,24 @@ class DeployVersion1():
                     self.__current_position = hierarchy1
                     self.__op = op
                     sg_rules = []
-                    for rule in c[u'SecurityGroupRules']:
-                        rule = self.__explain(rule)
-                        if rule:
-                            sg_rules.append(rule)
+                    if u'SecurityGroupRules' in c:
+                        for rule in c[u'SecurityGroupRules']:
+                            rule = self.__explain(rule)
+                            if rule:
+                                sg_rules.append(rule)
                     sg_rules.append(u'tcp 22 0.0.0.0/0')
                     init_parameters = []
-                    for param in c[u'InitParameters']:
-                        param = self.__explain(param)
-                        if param:
-                            init_parameters.append(param)
+                    if u'InitParameters' in c:
+                        for param in c[u'InitParameters']:
+                            param = self.__explain(param)
+                            if param:
+                                init_parameters.append(param)
+                    deps = []
+                    if u'Depends' in c:
+                        for dep in c[u'Depends']:
+                            dep = self.__explain(dep)
+                            if dep:
+                                deps.append(dep)
                     op.set_instance_sg(hierarchy1, sg_rules)
                     username, key_filename = op.get_login_user(hierarchy1)
                     hostname = op.get_public_ip(hierarchy1)
@@ -330,10 +336,8 @@ class DeployVersion1():
                     scopy.put(src, dst, True)
                     ssh.close()
                     op.close_ssh(hierarchy1)
-                    run_init = RunInit(hierarchy1, name, hostname, username, key_filename, None, init_parameters)
-                    if name not in self.__not_init:
-                        self.__not_init[name] = []
-                    self.__not_init[name].append(run_init)
+                    run_init = RunInit(hierarchy1, name, hostname, username, key_filename, deps, init_parameters)
+                    self.__not_init.append(run_init)
 
     def __get_number(self, number):
         t = type(number)
@@ -424,6 +428,8 @@ class DeployVersion1():
                 return self.__op.get_private_ip(ori_uuid)
             elif attr == u'public_ip':
                 return self.__op.get_public_ip(ori_uuid)
+            elif attr == u'uuid':
+                return ori_uuid
             else:
                 raise Exception(u'Unknown attr: %s' % atr)
         else:
