@@ -6,6 +6,9 @@ import sys
 import os
 import getopt
 import yaml
+import urllib2
+import zipfile
+import shutil
 from parsing_version_1 import DeployVersion1, EraseVersion1
 
 def load_local_template_file(template_dir):
@@ -14,8 +17,39 @@ def load_local_template_file(template_dir):
         template = yaml.safe_load(f)
     return (template, template_dir)
 
+def unzip_file(zipfilename, unziptodir):
+    if not os.path.exists(unziptodir): os.mkdir(unziptodir, 0777)
+    zfobj = zipfile.ZipFile(zipfilename)
+    for name in zfobj.namelist():
+        name = name.replace('\\','/')
+        if name.endswith('/'):
+            os.mkdir(os.path.join(unziptodir, name))
+        else:
+            ext_filename = os.path.join(unziptodir, name)
+            ext_dir= os.path.dirname(ext_filename)
+            if not os.path.exists(ext_dir) : os.mkdir(ext_dir,0777)
+            outfile = open(ext_filename, 'wb')
+            outfile.write(zfobj.read(name))
+            outfile.close()
+
+url_prefix = u'http://workstation.yupeng820921.tk/download/'
 def load_remote_template_file(service_name):
-    return ()
+    url = url_prefix + service_name
+    request = urllib2.Request(url)
+    opener = urllib2.build_opener()
+    download_link = opener.open(request).read()
+    r=urllib2.urlopen(download_link)
+    download_dir = u'/tmp/.clin/'
+    if not os.path.exists(download_dir):
+        os.mkdir(download_dir)
+    download_name = service_name + u'.zip'
+    f=open(download_dir + download_name, u'wb')
+    f.write(r.read())
+    f.close()
+    if os.path.exists(download_dir+service_name):
+        shutil.rmtree(download_dir+service_name)
+    unzip_file(download_dir+download_name, download_dir)
+    return load_local_template_file(download_dir+service_name)
 
 def load_template(service_name):
     local_flag = u'file://'
