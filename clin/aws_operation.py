@@ -214,9 +214,13 @@ class AwsOperation(CloudOperation):
     def release_all_resources(self):
         conn = boto.ec2.connect_to_region(self.__region)
         filters = {u'tag:Stack':self.__stack_name}
+        volume_ids = []
         reservations = conn.get_all_instances(filters = filters)
         for r in reservations:
             i = r.instances[0]
+            devs = i.block_device_mapping
+            for dev in devs:
+                volume_ids.append(devs[dev].volume_id)
             i.terminate()
         while True:
             reservations = conn.get_all_instances(filters = filters)
@@ -228,6 +232,9 @@ class AwsOperation(CloudOperation):
             if all_terminated:
                 break
             time.sleep(3)
+
+        for volume_id in volume_ids:
+            conn.delete_volume(volume_id)
 
         sgs = conn.get_all_security_groups(filters={u'description':self.__sg_prefix + self.__stack_name})
         for sg in sgs:
