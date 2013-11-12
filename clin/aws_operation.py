@@ -234,16 +234,32 @@ class AwsOperation(CloudOperation):
             time.sleep(3)
 
         for volume_id in volume_ids:
-            conn.delete_volume(volume_id)
+            retry = 5
+            while retry > 0:
+                try:
+                    conn.delete_volume(volume_id)
+                except Exception, e:
+                    time.sleep(1)
+                else:
+                    break
+                retry -= 1
+            if retry == 0:
+                conn.delete_volume(volume_id)
 
         sgs = conn.get_all_security_groups(filters={u'description':self.__sg_prefix + self.__stack_name})
         for sg in sgs:
             for rule in sg.rules:
                 for grant in rule.grants:
-                    if grant.group_id:
-                        sg.revoke(rule.ip_protocol, rule.from_port, rule.to_port, grant.cidr_ip, grant)
-                    else:
-                        sg.revoke(rule.ip_protocol, rule.from_port, rule.to_port, grant.cidr_ip, None)
+                    sg.revoke(rule.ip_protocol, rule.from_port, rule.to_port, grant.cidr_ip, grant)
+                    # print(rule.ip_protocol)
+                    # print(rule.from_port)
+                    # print(rule.to_port)
+                    # print(grant.cidr_ip)
+                    # print(grant.group_id)
+                    # if grant.group_id:
+                    #     sg.revoke(rule.ip_protocol, rule.from_port, rule.to_port, grant.cidr_ip, grant)
+                    # else:
+                    #     sg.revoke(rule.ip_protocol, rule.from_port, rule.to_port, grant.cidr_ip, None)
         for sg in sgs:
             retry = 5
             while retry > 0:

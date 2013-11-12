@@ -9,6 +9,7 @@ import yaml
 import urllib2
 import zipfile
 import shutil
+import requests
 from parsing_version_1 import DeployVersion1, EraseVersion1
 
 def load_local_template_file(template_dir):
@@ -16,6 +17,22 @@ def load_local_template_file(template_dir):
     with open(template_file, 'r') as f:
         template = yaml.safe_load(f)
     return (template, template_dir)
+
+def zip_dir(dirname,zipfilename):
+    filelist = []
+    if os.path.isfile(dirname):
+        filelist.append(dirname)
+    else :
+        for root, dirs, files in os.walk(dirname):
+            for name in files:
+                filelist.append(os.path.join(root, name))
+
+    zf = zipfile.ZipFile(zipfilename, "w", zipfile.zlib.DEFLATED)
+    for tar in filelist:
+        arcname = tar[len(dirname):]
+        #print arcname
+        zf.write(tar,arcname)
+    zf.close()
 
 def unzip_file(zipfilename, unziptodir):
     if not os.path.exists(unziptodir): os.mkdir(unziptodir, 0777)
@@ -32,9 +49,10 @@ def unzip_file(zipfilename, unziptodir):
             outfile.write(zfobj.read(name))
             outfile.close()
 
-url_prefix = u'http://workstation.yupeng820921.tk/download/'
+url_prefix = u'http://cloudinstall.yupeng820921.tk'
+download_prefix = url_prefix + u'/download/'
 def load_remote_template_file(service_name):
-    url = url_prefix + service_name
+    url = download_prefix + service_name
     request = urllib2.Request(url)
     opener = urllib2.build_opener()
     download_link = opener.open(request).read()
@@ -48,7 +66,7 @@ def load_remote_template_file(service_name):
     f.close()
     if os.path.exists(download_dir+service_name):
         shutil.rmtree(download_dir+service_name)
-    unzip_file(download_dir+download_name, download_dir)
+    unzip_file(download_dir+download_name, download_dir+service_name)
     return load_local_template_file(download_dir+service_name)
 
 def load_template(service_name):
@@ -69,13 +87,25 @@ def subcmd(name):
         return __subcmd
     return _subcmd
 
+@subcmd(u'upload')
+def clin_upload(argv):
+    package_dir = argv[0]
+    if package_dir[-1] == u'/':
+        package_dir = package_dir[0:-1]
+    package_name = package_dir.rsplit('/')[-1]
+    zip_dir(package_dir, package_dir+u'.zip')
+    files = {'packagefile': (package_name+u'.zip', open(package_dir+u'.zip', 'rb'))}
+    url = url_prefix + u'?action=upload'
+    r = requests.post(url, files=files)
+    os.remove(package_dir+u'.zip')
+
 @subcmd(u'deploy')
 def clin_deploy(argv):
 
     def deploy_usage():
         print(u'deploy_usage')
 
-    long_params = [u'stack-name=', u'producter=', u'region=', \
+    long_params = [u'stack-name=', u'productor=', u'region=', \
                        u'parameter-file=', u'dump-parameter=', \
                        u'yes', u'debug', u'conf-dir']
     try:
@@ -85,7 +115,7 @@ def clin_deploy(argv):
         sys.exit(1)
 
     stack_name = None
-    producter = None
+    productor = None
     region = None
     parameter_file = None
     conf_dir = None
@@ -96,8 +126,8 @@ def clin_deploy(argv):
     for o, a in opts:
         if o == u'--stack-name':
             stack_name = a
-        elif o == u'--producter':
-            producter = a
+        elif o == u'--productor':
+            productor = a
         elif o == u'--parameter-file':
             parameter_file = a
         elif o == u'--region':
@@ -146,7 +176,7 @@ def clin_deploy(argv):
     if u'Version' in template:
         v = template[u'Version']
         if v == 1:
-            DeployVersion1(template, template_dir, stack_name, producter, region, parameter_file, \
+            DeployVersion1(template, template_dir, stack_name, productor, region, parameter_file, \
                                use_default, debug, dump_parameter, conf_dir)
         else:
             sys.stderr.write(u'unsupport version: %s' % v)
@@ -165,7 +195,7 @@ def clin_erase(argv):
     def erase_usage():
         print(u'erase_usage')
 
-    long_params = [u'stack-name=', u'producter=', u'region=', u'conf-dir']
+    long_params = [u'stack-name=', u'productor=', u'region=', u'conf-dir']
     try:
         opts, args = getopt.gnu_getopt(argv, u'', long_params)
     except getopt.GetoptError, e:
@@ -173,14 +203,14 @@ def clin_erase(argv):
         sys.exit(1)
 
     stack_name = None
-    producter = None
+    productor = None
     region = None
     conf_dir = None
     for o, a in opts:
         if o == u'--stack-name':
             stack_name = a
-        elif o == u'--producter':
-            producter = a
+        elif o == u'--productor':
+            productor = a
         elif o == u'--region':
             region = a
         elif o == u'--conf-dir':
@@ -201,7 +231,7 @@ def clin_erase(argv):
             conf_dir = os.getcwd()
     conf_dir = conf_dir + u'/.clin'
 
-    EraseVersion1(stack_name, producter, region, conf_dir)
+    EraseVersion1(stack_name, productor, region, conf_dir)
 
 @subcmd(u'update')
 def clin_update(argv):

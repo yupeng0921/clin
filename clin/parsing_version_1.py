@@ -11,11 +11,11 @@ from jinja2 import Template, Environment, FileSystemLoader
 import paramiko
 import scp
 
-producter_dict = {}
+productor_dict = {}
 import aws_operation
-producter_dict[u'aws'] = aws_operation.AwsOperation
+productor_dict[u'aws'] = aws_operation.AwsOperation
 import pseudo
-producter_dict[u'pseudo'] = pseudo.PseudoOperation
+productor_dict[u'pseudo'] = pseudo.PseudoOperation
 
 class Instance():
     def __init__(self, uuid):
@@ -37,10 +37,10 @@ class DeployVersion1():
     __parameter_dict = {}
     __uuid_dict = {}
     __instance_name_list = []
-    def __init__(self, template, template_dir, stack_name, producter, region, parameter_file, \
+    def __init__(self, template, template_dir, stack_name, productor, region, parameter_file, \
                      use_default, debug, dump_parameter, conf_dir):
         input_parameter_dict = {}
-        input_producter_dict = {}
+        input_productor_dict = {}
         if parameter_file:
             with open(parameter_file, u'r') as f:
                 pf = yaml.safe_load(f)
@@ -53,25 +53,25 @@ class DeployVersion1():
                     for name in pf[u'Parameters']:
                         input_parameter_dict[name] = pf[u'Parameters'][name]
                 if u'Resources' in pf:
-                    for producter in pf[u'Resources']:
-                        producter_parameter_dict = {}
-                        for parameter in pf[u'Resources'][producter]:
-                            producter_parameter_dict[parameter] = pf[u'Resources'][producter][parameter]
-                        input_producter_dict[producter] = producter_parameter_dict
+                    for productor in pf[u'Resources']:
+                        productor_parameter_dict = {}
+                        for parameter in pf[u'Resources'][productor]:
+                            productor_parameter_dict[parameter] = pf[u'Resources'][productor][parameter]
+                        input_productor_dict[productor] = productor_parameter_dict
 
         if u'Parameters' in template:
             self.__get_parameters(template[u'Parameters'], input_parameter_dict, use_default, False)
 
-        valid_producter = producter_dict.keys()
-        if producter:
-            if not producter in valid_producter:
-                raise Exception(u'invalid producter name: %s\nonly support: %s' % \
-                                    (producter, valid_producter))
+        valid_productor = productor_dict.keys()
+        if productor:
+            if not productor in valid_productor:
+                raise Exception(u'invalid productor name: %s\nonly support: %s' % \
+                                    (productor, valid_productor))
         else:
-            prompt = u'producter name:'
+            prompt = u'productor name:'
             while True:
-                producter = raw_input(prompt)
-                if producter in valid_producter:
+                productor = raw_input(prompt)
+                if productor in valid_productor:
                     break
 
         if dump_parameter == u'only':
@@ -81,9 +81,9 @@ class DeployVersion1():
 
         op = None
         if u'Resources' in template:
-            op_class = producter_dict[producter]
-            if producter in input_producter_dict:
-                input_param_dict = input_producter_dict[producter]
+            op_class = productor_dict[productor]
+            if productor in input_productor_dict:
+                input_param_dict = input_productor_dict[productor]
             else:
                 input_param_dict = {}
             op = op_class(stack_name, conf_dir, only_dump, input_param_dict)
@@ -96,9 +96,9 @@ class DeployVersion1():
             if self.__parameter_dict:
                 dump_dict[u'Parameters'] = self.__parameter_dict
             if op:
-                producter_instance_dict = {}
-                producter_instance_dict[producter] = op.return_all_configure()
-                dump_dict[u'Resources'] = producter_instance_dict
+                productor_instance_dict = {}
+                productor_instance_dict[productor] = op.return_all_configure()
+                dump_dict[u'Resources'] = productor_instance_dict
             file_name = u'%s-%s.conf' % (stack_name, int(time.time()))
             with open(file_name, 'w') as f:
                 yaml.safe_dump(dump_dict, f)
@@ -316,12 +316,12 @@ class DeployVersion1():
                     op.open_ssh(hierarchy1)
                     ssh=paramiko.SSHClient()
                     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                    retry = 10
+                    retry = 100
                     while retry > 0:
                         try:
                             ssh.connect(hostname=hostname, username=username, key_filename=key_filename)
                         except Exception, e:
-                            time.sleep(1)
+                            time.sleep(3)
                         else:
                             break
                         retry -= 1
@@ -436,20 +436,20 @@ class DeployVersion1():
             return None
 
 class EraseVersion1():
-    def __init__(self, stack_name, producter, region, conf_dir):
-        valid_producter = producter_dict.keys()
-        if producter:
-            if not producter in valid_producter:
-                raise Exception(u'invalid producter name: %s\nonly support: %s' % \
-                                    (producter, valid_producter))
+    def __init__(self, stack_name, productor, region, conf_dir):
+        valid_productor = productor_dict.keys()
+        if productor:
+            if not productor in valid_productor:
+                raise Exception(u'invalid productor name: %s\nonly support: %s' % \
+                                    (productor, valid_productor))
         else:
-            prompt = u'producter name:'
+            prompt = u'productor name:'
             while True:
-                producter = raw_input(prompt)
-                if producter in valid_producter:
+                productor = raw_input(prompt)
+                if productor in valid_productor:
                     break
 
-        op_class = producter_dict[producter]
+        op_class = productor_dict[productor]
         op = op_class(stack_name, conf_dir, None, None)
         op.get_region(region)
         op.release_all_resources()
