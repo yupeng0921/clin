@@ -135,6 +135,7 @@ class DeployVersion1():
                 yaml.safe_dump(dump_dict, f)
 
         if only_dump:
+            print resources_template
             return
 
         if op:

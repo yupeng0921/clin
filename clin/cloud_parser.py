@@ -129,7 +129,7 @@ def main():
     parser_deploy.add_argument(u'--stack-name', required=True, \
                                    help=u'the stack name of the service, \
 shoud be unique per productor per region')
-    parser_deploy.add_argument(u'--configure-file', type=argparse.FileType(u'r'), \
+    parser_deploy.add_argument(u'--configure-file', \
                                    help=u'yaml format file for the deploied service configuration')
     parser_deploy.add_argument(u'--dump-configure', choices=(u'yes', u'no', u'only'), default=u'no', \
                                    help=u'yes meams dump configure to current directory,\
