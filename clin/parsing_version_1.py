@@ -72,7 +72,8 @@ class DeployVersion1():
                     break
                 if line[0:len(o)] == o:
                     break
-                parameters_string = u'%s%s' % (parameters_string, line)
+                if start_flag:
+                    parameters_string = u'%s%s' % (parameters_string, line)
         pt = yaml.safe_load(parameters_string)
         if u'Parameters' in pt:
             self.__get_parameters(pt[u'Parameters'], input_parameter_dict, use_default, False)
@@ -105,7 +106,8 @@ class DeployVersion1():
                     start_flag =True
                 if line[0:len(o)] == o:
                     break
-                resources_string = u'%s%s' % (resources_string, line)
+                if start_flag:
+                    resources_string = u'%s%s' % (resources_string, line)
         t = Template(resources_string)
         after_render = t.render(self.__parameter_dict)
         resources_template = yaml.safe_load(after_render)
@@ -207,7 +209,7 @@ class DeployVersion1():
                     inp = input_parameter_dict[name]
                     if not inp in enable_flag+disable_flag:
                         raise Exception(u'invalid input, %s: %s\n' % (name, inp))
-                elif use_default:
+                elif use_default == u'yes':
                     inp = body[u'Default']
                     if not inp in enable_flag+disable_flag:
                         Exception(u'invalid input, %s: %s\n' % (name, inp))
@@ -235,7 +237,7 @@ class DeployVersion1():
                     (ret, reason) = self.__verify_input(body, inp)
                     if ret == False:
                         raise Exception(reason)
-                elif use_default:
+                elif use_default == u'yes':
                     inp = body[u'Default']
                     (ret, reason) = self.__verify_input(body, inp)
                     if ret == False:
@@ -277,7 +279,7 @@ class DeployVersion1():
         for name in groups:
             body = groups[name]
             t = body[u'Type']
-            number = self.__get_number(body[u'Number'])
+            number = body[u'Number']
             if number <= 0:
                 continue
             if t == u'InstanceGroup':
@@ -292,7 +294,7 @@ class DeployVersion1():
         for name in groups:
             body = groups[name]
             t = body[u'Type']
-            number = self.__get_number(body[u'Number'])
+            number = body[u'Number']
             if t == u'InstanceGroup':
                 for i in range(0, number):
                     hierarchy1 = u'%s/%s:%d' % (hierarchy, name, i)
@@ -314,7 +316,7 @@ class DeployVersion1():
         for name in groups:
             body = groups[name]
             t = body[u'Type']
-            number = self.__get_number(body[u'Number'])
+            number = body[u'Number']
             if t == u'InstanceGroup':
                 for i in range(0, number):
                     hierarchy1 = u'%s/%s:%d' % (hierarchy, name, i)
@@ -377,20 +379,6 @@ class DeployVersion1():
                     op.close_ssh(hierarchy1)
                     run_init = RunInit(hierarchy1, name, hostname, username, key_filename, deps, init_parameters)
                     self.__not_init.append(run_init)
-
-    def __get_number(self, number):
-        t = type(number)
-        if t is not types.IntType:
-            if t is types.StringType or t is types.UnicodeType:
-                if number in self.__parameter_dict:
-                    number = self.__parameter_dict[number]
-                    if type(number) is not types.IntType:
-                        raise Exception(u'Unsupport number type: %s %s' % (number, type(number)))
-                else:
-                    raise Exception(u'Unknown number: %s' % number)
-            else:
-                raise Exception(u'Unsupport number type: %s %s' % (number, t))
-        return number
 
     def __explain(self, param):
         if type(param) is not types.StringType and type(param) is not types.UnicodeType:

@@ -4,7 +4,6 @@
 
 import sys
 import os
-import getopt
 import yaml
 import urllib2
 import zipfile
