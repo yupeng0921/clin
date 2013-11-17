@@ -37,17 +37,17 @@ class DeployVersion1():
     __parameter_dict = {}
     __uuid_dict = {}
     __instance_name_list = []
-    def __init__(self, template, template_dir, stack_name, productor, region, parameter_file, \
-                     use_default, debug, dump_parameter, conf_dir):
+    def __init__(self, template_dir, stack_name, productor, region, configure_file, \
+                     use_default, dump_configure, clin_default_dir):
         input_parameter_dict = {}
         input_productor_dict = {}
-        if parameter_file:
-            with open(parameter_file, u'r') as f:
+        if configure_file:
+            with open(configure_file, u'r') as f:
                 pf = yaml.safe_load(f)
             if not u'Version' in pf:
-                raise Exception(u'parameter file has no version: %s\n' % parameter_file)
+                raise Exception(u'parameter file has no version: %s\n' % configure_file)
             elif pf[u'Version'] != 1:
-                raise Exception(u'version of parameter file is not 1: %s' % parameter_file)
+                raise Exception(u'version of parameter file is not 1: %s' % configure_file)
             else:
                 if u'Parameters' in pf:
                     for name in pf[u'Parameters']:
@@ -59,8 +59,23 @@ class DeployVersion1():
                             productor_parameter_dict[parameter] = pf[u'Resources'][productor][parameter]
                         input_productor_dict[productor] = productor_parameter_dict
 
-        if u'Parameters' in template:
-            self.__get_parameters(template[u'Parameters'], input_parameter_dict, use_default, False)
+        parameters_string = ''
+        with open(u'%s/init.yml' % template_dir, u'r') as f:
+            start_flag = False
+            p = u'Parameters'
+            r = u'Resources'
+            o = u'Outputs'
+            for line in f:
+                if line[0:len(p)] == p:
+                    start_flag =True
+                if line[0:len(r)] == r:
+                    break
+                if line[0:len(o)] == o:
+                    break
+                parameters_string = u'%s%s' % (parameters_string, line)
+        pt = yaml.safe_load(parameters_string)
+        if u'Parameters' in pt:
+            self.__get_parameters(pt[u'Parameters'], input_parameter_dict, use_default, False)
 
         valid_productor = productor_dict.keys()
         if productor:
@@ -74,23 +89,37 @@ class DeployVersion1():
                 if productor in valid_productor:
                     break
 
-        if dump_parameter == u'only':
+        if dump_configure == u'only':
             only_dump = True
         else:
             only_dump = False
 
         op = None
-        if u'Resources' in template:
+        resources_string = ''
+        with open(u'%s/init.yml' % template_dir, u'r') as f:
+            start_flag = False
+            r = u'Resources'
+            o = u'Outputs'
+            for line in f:
+                if line[0:len(r)] == r:
+                    start_flag =True
+                if line[0:len(o)] == o:
+                    break
+                resources_string = u'%s%s' % (resources_string, line)
+        t = Template(resources_string)
+        after_render = t.render(self.__parameter_dict)
+        resources_template = yaml.safe_load(after_render)
+        if u'Resources' in resources_template:
             op_class = productor_dict[productor]
             if productor in input_productor_dict:
                 input_param_dict = input_productor_dict[productor]
             else:
                 input_param_dict = {}
-            op = op_class(stack_name, conf_dir, only_dump, input_param_dict)
+            op = op_class(stack_name, clin_default_dir, only_dump, input_param_dict)
             op.get_region(region)
-            self.__get_group_configure(template[u'Resources'], op)
+            self.__get_group_configure(resources_template[u'Resources'], op)
 
-        if dump_parameter in ('yes', 'only'):
+        if dump_configure in ('yes', 'only'):
             dump_dict = {}
             dump_dict[u'Version'] = 1
             if self.__parameter_dict:
@@ -110,7 +139,7 @@ class DeployVersion1():
             self.__uuid_list = []
             self.__render_dict = {}
             print(u'launching resources')
-            self.__launch_group(template[u'Resources'], stack_name, op)
+            self.__launch_group(resources_template[u'Resources'], stack_name, op)
             print(u'waiting resources')
             for uuid in self.__uuid_list:
                 op.wait_instance(uuid, 0)
@@ -124,7 +153,7 @@ class DeployVersion1():
             print(u'initing instances')
             self.__not_init = []
             self.__already_init = []
-            self.__init_instances(template[u'Resources'], stack_name, op)
+            self.__init_instances(resources_template[u'Resources'], stack_name, op)
             while len(self.__not_init) > 0:
                 tmp_list = []
                 for run_init in self.__not_init:
@@ -446,7 +475,7 @@ class DeployVersion1():
             return None
 
 class EraseVersion1():
-    def __init__(self, stack_name, productor, region, conf_dir):
+    def __init__(self, stack_name, productor, region, clin_default_dir):
         valid_productor = productor_dict.keys()
         if productor:
             if not productor in valid_productor:
@@ -460,6 +489,6 @@ class EraseVersion1():
                     break
 
         op_class = productor_dict[productor]
-        op = op_class(stack_name, conf_dir, None, None)
+        op = op_class(stack_name, clin_default_dir, None, None)
         op.get_region(region)
         op.release_all_resources()

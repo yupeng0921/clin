@@ -10,13 +10,8 @@ import urllib2
 import zipfile
 import shutil
 import requests
+import argparse
 from parsing_version_1 import DeployVersion1, EraseVersion1
-
-def load_local_template_file(template_dir):
-    template_file = u'%s/init.yml' % template_dir
-    with open(template_file, 'r') as f:
-        template = yaml.safe_load(f)
-    return (template, template_dir)
 
 def zip_dir(dirname,zipfilename):
     filelist = []
@@ -67,29 +62,18 @@ def load_remote_template_file(service_name):
     if os.path.exists(download_dir+service_name):
         shutil.rmtree(download_dir+service_name)
     unzip_file(download_dir+download_name, download_dir+service_name)
-    return load_local_template_file(download_dir+service_name)
+    return download_dir+service_name
 
 def load_template(service_name):
     local_flag = u'file://'
     length = len(local_flag)
     if service_name[0:length] == local_flag:
-        return load_local_template_file(service_name[length:])
+        return service_name[length:]
     else:
         return load_remote_template_file(service_name)
 
-sub_commands = {}
-def subcmd(name):
-    def _subcmd(func):
-        sub_commands[name] =func
-        def __subcmd(*args, **kwargs):
-            ret = func(*args, **kwargs)
-            return ret
-        return __subcmd
-    return _subcmd
-
-@subcmd(u'upload')
-def clin_upload(argv):
-    package_dir = argv[0]
+def clin_upload(args):
+    package_dir = args.package_dir
     if package_dir[-1] == u'/':
         package_dir = package_dir[0:-1]
     package_name = package_dir.rsplit('/')[-1]
@@ -99,165 +83,79 @@ def clin_upload(argv):
     r = requests.post(url, files=files)
     os.remove(package_dir+u'.zip')
 
-@subcmd(u'deploy')
-def clin_deploy(argv):
+def clin_deploy(args):
 
-    def deploy_usage():
-        print(u'deploy_usage')
-
-    long_params = [u'stack-name=', u'productor=', u'region=', \
-                       u'parameter-file=', u'dump-parameter=', \
-                       u'yes', u'debug', u'conf-dir']
-    try:
-        opts, args = getopt.gnu_getopt(argv, u'y', long_params)
-    except getopt.GetoptError, e:
-        deploy_usage()
-        sys.exit(1)
-
-    stack_name = None
-    productor = None
-    region = None
-    parameter_file = None
-    conf_dir = None
-    region = None
-    use_default = False
-    debug = False
-    dump_parameter = u'no'
-    for o, a in opts:
-        if o == u'--stack-name':
-            stack_name = a
-        elif o == u'--productor':
-            productor = a
-        elif o == u'--parameter-file':
-            parameter_file = a
-        elif o == u'--region':
-            region = a
-        elif o == u'-template-file':
-            template_file = a
-        elif o == u'--dump-parameter':
-            if a in (u'no', u'yes', u'only'):
-                dump_parameter = a
-            else:
-                sys.stderr.write(u'invalid dump-parameter: %s, should be no, yes, only\n' % a)
-                sys.exit(1)
-        elif o in (u'-y', '--yes'):
-            use_default = True
-        elif o == u'--conf-dir':
-            conf_dir = a
-        elif o == u'--debug':
-            debug = True
-        else:
-            sys.stderr.write(u'invalid args: %s %s\n' % (o, a))
-            sys.exit(1)
-
-    if len(args) != 1:
-        sys.stderr.write(u'should specific 1 and only 1 service name\n')
-        for a in args:
-            sys.stderr.write(a)
-            sys.stderr.write(u'\n')
-        deploy_usage()
-        sys.exit(1)
-    service_name = args[0]
-
-    if not stack_name:
-        sys.stderr.write(u'no stack name')
-        deploy_usage()
-        sys.exit(1)
-
-    if not conf_dir:
+    clin_default_dir = args.clin_default_dir
+    if not clin_default_dir:
         if u'HOME' in os.environ:
-            conf_dir = os.environ['HOME']
+            clin_default_dir = os.environ['HOME']
         else:
-            conf_dir = os.getcwd()
-    conf_dir = conf_dir + u'/.clin'
+            clin_default_dir = os.getcwd()
+    clin_default_dir = clin_default_dir + u'/.clin'
 
-    template, template_dir = load_template(service_name)
+    template_dir = load_template(args.name)
 
-    if u'Version' in template:
-        v = template[u'Version']
-        if v == 1:
-            DeployVersion1(template, template_dir, stack_name, productor, region, parameter_file, \
-                               use_default, debug, dump_parameter, conf_dir)
-        else:
-            sys.stderr.write(u'unsupport version: %s' % v)
-            sys.exit(1)
+    with open(u'%s/init.yml' % template_dir, u'r') as f:
+        first_line = f.next()
+        t = yaml.safe_load(first_line)
+        if u'Version' not in t:
+            raise Exception(u'Version not found')
+        v = t[u'Version']
+    if v == 1:
+        DeployVersion1(template_dir, args.stack_name, args.productor, args.region, args.configure_file, \
+                               args.use_default, args.dump_configure, args.clin_default_dir)
     else:
-        sys.stderr.write(u'should specific Version in template')
-        sys.exit(1)
+        raise Exception(u'unsupport version: %s' % v)
 
-@subcmd(u'describe')
-def clin_describe(argv):
-    print(argv)
+def clin_erase(args):
 
-@subcmd(u'erase')
-def clin_erase(argv):
-
-    def erase_usage():
-        print(u'erase_usage')
-
-    long_params = [u'stack-name=', u'productor=', u'region=', u'conf-dir']
-    try:
-        opts, args = getopt.gnu_getopt(argv, u'', long_params)
-    except getopt.GetoptError, e:
-        erase_usage()
-        sys.exit(1)
-
-    stack_name = None
-    productor = None
-    region = None
-    conf_dir = None
-    for o, a in opts:
-        if o == u'--stack-name':
-            stack_name = a
-        elif o == u'--productor':
-            productor = a
-        elif o == u'--region':
-            region = a
-        elif o == u'--conf-dir':
-            conf_dir = a
-        else:
-            sys.stderr.write(u'invalid args: %s %s\n' % (o, a))
-            sys.exit(1)
-
-    if not stack_name:
-        sys.stderr.write(u'no stack name')
-        erase_usage()
-        sys.exit(1)
-
-    if not conf_dir:
+    if not clin_default_dir:
         if u'HOME' in os.environ:
-            conf_dir = os.environ['HOME']
+            clin_default_dir = os.environ['HOME']
         else:
-            conf_dir = os.getcwd()
-    conf_dir = conf_dir + u'/.clin'
+            clin_default_dir = os.getcwd()
+    clin_default_dir = clin_default_dir + u'/.clin'
 
-    EraseVersion1(stack_name, productor, region, conf_dir)
-
-@subcmd(u'update')
-def clin_update(argv):
-    print(argv)
-
-def usage():
-    print(u'usage')
+    EraseVersion1(args.stack_name, args.productor, args.region, args.clin_default_dir)
 
 def main():
-    try:
-        if sys.argv[1] == u'--help':
-            usage()
-            sys.exit(0)
-        elif sys.argv[1] == u'--version':
-            print(u'version')
-            sys.exit(0)
-        else:
-            sub_command = sub_commands[sys.argv[1]]
-    except KeyError, e:
-        usage()
-        sys.exit(1)
-    except IndexError, e:
-        usage()
-        sys.exit(1)
+    parser = argparse.ArgumentParser(prog=u'clin', add_help=True)
+    import __init__
+    parser.add_argument(u'-v', u'--version', action=u'version', version=__init__.__version__)
+    subparsers = parser.add_subparsers(help='sub-command help')
+    parser_deploy = subparsers.add_parser(u'deploy', help=u'deploy a service to a cloud platform')
+    parser_deploy.add_argument(u'name', help=u'service name, if start with file:// while be consider as local package')
+    parser_deploy.add_argument(u'--productor', help=u'the cloud platform vendor')
+    parser_deploy.add_argument(u'--region', help=u'region of the productor')
+    parser_deploy.add_argument(u'--stack-name', required=True, \
+                                   help=u'the stack name of the service, \
+shoud be unique per productor per region')
+    parser_deploy.add_argument(u'--configure-file', type=argparse.FileType(u'r'), \
+                                   help=u'yaml format file for the deploied service configuration')
+    parser_deploy.add_argument(u'--dump-configure', choices=(u'yes', u'no', u'only'), default=u'no', \
+                                   help=u'yes meams dump configure to current directory,\
+no means do not dump configure,\
+only means only dump configure file, do not do actual deploy')
+    parser_deploy.add_argument(u'--use-default', choices=(u'yes', u'no'), default=u'no', \
+                                   help=u'whether use package default value')
+    parser_deploy.add_argument(u'--clin-default-dir', help=u'the default directory for configure file of clin program')
+    parser_deploy.set_defaults(func=clin_deploy)
 
-    sub_command(sys.argv[2:])
+    parser_erase = subparsers.add_parser('erase', help='erase a service from a cloud platform')
+    parser_erase.add_argument('--productor', help='the cloud platform vendor')
+    parser_erase.add_argument(u'--region', help=u'region of the productor')
+    parser_erase.add_argument(u'--stack-name', required=True, \
+                                  help=u'the stack name of the service, \
+shoud be unique per productor per region')
+    parser_erase.add_argument(u'--clin-default-dir', help=u'the default directory for configure file of clin program')
+    parser_erase.set_defaults(func=clin_erase)
+
+    parser_upload = subparsers.add_parser(u'upload', help=u'upload package to cloud install web site')
+    parser_upload.add_argument(u'package_dir', help=u'the local directory of the package')
+    parser_upload.set_defaults(func=clin_upload)
+
+    args = parser.parse_args()
+    args.func(args)
 
 if __name__ == u'__main__':
     main()
