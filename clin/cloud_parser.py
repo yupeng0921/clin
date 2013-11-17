@@ -102,12 +102,13 @@ def clin_deploy(args):
         v = t[u'Version']
     if v == 1:
         DeployVersion1(template_dir, args.stack_name, args.productor, args.region, args.configure_file, \
-                               args.use_default, args.dump_configure, args.clin_default_dir)
+                               args.use_default, args.dump_configure, clin_default_dir)
     else:
         raise Exception(u'unsupport version: %s' % v)
 
 def clin_erase(args):
 
+    clin_default_dir = args.clin_default_dir
     if not clin_default_dir:
         if u'HOME' in os.environ:
             clin_default_dir = os.environ['HOME']
@@ -115,7 +116,7 @@ def clin_erase(args):
             clin_default_dir = os.getcwd()
     clin_default_dir = clin_default_dir + u'/.clin'
 
-    EraseVersion1(args.stack_name, args.productor, args.region, args.clin_default_dir)
+    EraseVersion1(args.stack_name, args.productor, args.region, clin_default_dir)
 
 def main():
     parser = argparse.ArgumentParser(prog=u'clin', add_help=True)
