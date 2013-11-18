@@ -59,7 +59,7 @@ class DeployVersion1():
                             productor_parameter_dict[parameter] = pf[u'Resources'][productor][parameter]
                         input_productor_dict[productor] = productor_parameter_dict
 
-        parameters_string = ''
+        parameters_string = u''
         with open(u'%s/init.yml' % template_dir, u'r') as f:
             start_flag = False
             p = u'Parameters'
@@ -75,7 +75,7 @@ class DeployVersion1():
                 if start_flag:
                     parameters_string = u'%s%s' % (parameters_string, line)
         pt = yaml.safe_load(parameters_string)
-        if u'Parameters' in pt:
+        if pt and u'Parameters' in pt:
             self.__get_parameters(pt[u'Parameters'], input_parameter_dict, use_default, False)
 
         valid_productor = productor_dict.keys()
@@ -96,7 +96,7 @@ class DeployVersion1():
             only_dump = False
 
         op = None
-        resources_string = ''
+        resources_string = u''
         with open(u'%s/init.yml' % template_dir, u'r') as f:
             start_flag = False
             r = u'Resources'
@@ -111,7 +111,7 @@ class DeployVersion1():
         t = Template(resources_string)
         after_render = t.render(self.__parameter_dict)
         resources_template = yaml.safe_load(after_render)
-        if u'Resources' in resources_template:
+        if resources_template and u'Resources' in resources_template:
             op_class = productor_dict[productor]
             if productor in input_productor_dict:
                 input_param_dict = input_productor_dict[productor]
@@ -137,15 +137,15 @@ class DeployVersion1():
         if only_dump:
             return
 
+        self.__render_dict = {}
+        self.__current_position = None
         if op:
             self.__uuid_list = []
-            self.__render_dict = {}
             print(u'launching resources')
             self.__launch_group(resources_template[u'Resources'], stack_name, op)
             print(u'waiting resources')
             for uuid in self.__uuid_list:
                 op.wait_instance(uuid, 0)
-            self.__current_position = None
             self.__template_dir = template_dir
             self.__op = op
             self.__render_dict = dict(self.__render_dict, **self.__parameter_dict)
@@ -196,6 +196,31 @@ class DeployVersion1():
                 for run_init in tmp_list:
                     self.__not_init.remove(run_init)
 
+        outputs_string = u''
+        with open(u'%s/init.yml' % template_dir, u'r') as f:
+            start_flag = False
+            o = u'Outputs'
+            for line in f:
+                if line[0:len(o)] == o:
+                    start_flag = True
+                if start_flag:
+                    outputs_string = u'%s%s' % (outputs_string, line)
+        t = Template(outputs_string)
+        if not self.__render_dict:
+            self.__render_dict = dict(self.__render_dict, **self.__parameter_dict)
+        after_render = t.render(**self.__render_dict)
+        outputs_template = yaml.safe_load(after_render)
+        # use a fake current position, ensure do not filter any instance
+        self.__current_position = u'%s/&&&&&&&&' % stack_name
+        if outputs_template and u'Outputs' in outputs_template:
+            output_list = []
+            for item in outputs_template[u'Outputs']:
+                real_item = self.__explain(item)
+                if real_item:
+                    output_list.append(real_item)
+            print(u'Outputs:')
+            for item in output_list:
+                print(item)
     def __get_parameters(self, parameters, input_parameter_dict, use_default, disable):
         for name in parameters:
             body = parameters[name]
