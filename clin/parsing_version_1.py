@@ -214,10 +214,12 @@ class DeployVersion1():
         self.__current_position = u'%s/&&&&&&&&' % stack_name
         if outputs_template and u'Outputs' in outputs_template:
             output_list = []
-            for item in outputs_template[u'Outputs']:
-                real_item = self.__explain(item)
-                if real_item:
-                    output_list.append(real_item)
+            outputs = outputs_template[u'Outputs']
+            if outputs:
+                for item in outputs:
+                    real_item = self.__explain(item)
+                    if real_item:
+                        output_list.append(real_item)
             print(u'Outputs:')
             for item in output_list:
                 print(item)
@@ -310,7 +312,10 @@ class DeployVersion1():
             if t == u'InstanceGroup':
                 self.__get_group_configure(body[u'Members'], op)
             elif t == u'Instance':
-                description = body['Description']
+                if u'Description' in body:
+                    description = body[u'Description']
+                else:
+                    description = u''
                 op.get_instance_configure(name, description)
             else:
                 raise Exception(u'Unknown type: %s' % t)
