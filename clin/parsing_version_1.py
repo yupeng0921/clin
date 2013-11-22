@@ -12,14 +12,6 @@ from jinja2 import Template, Environment, FileSystemLoader
 import paramiko
 import scp
 
-def get_cur_info():
-    """Return the frame object for the caller's stack frame."""
-    try:
-        raise Exception
-    except:
-        f = sys.exc_info()[2].tb_frame.f_back
-        return str((f.f_code.co_name, f.f_lineno))
-
 productor_dict = {}
 import aws_operation
 productor_dict[u'aws'] = aws_operation.AwsOperation
@@ -52,6 +44,7 @@ class InstanceProfile(threading.Thread):
         self.on_init = on_init
         self.after_init = after_init
         self.__running = True
+        self.after_scp = False
         threading.Thread.__init__(self, name=uuid)
 
     def run(self):
@@ -71,7 +64,31 @@ class InstanceProfile(threading.Thread):
         on_init = self.on_init
         after_init = self.after_init
 
+        op.open_ssh(uuid)
+
         print(u'scp %s' % uuid)
+        ssh=paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        retry = 100
+        while retry > 0:
+            try:
+                ssh.connect(hostname=hostname, username=username, key_filename=key_filename)
+            except Exception, e:
+                time.sleep(3)
+            else:
+                break
+            retry -= 1
+        if retry == 0:
+            print(u'hostname=%s' % hostname)
+            print(u'username=%s' % username)
+            print(u'key_filename=%s' % key_filename)
+        ssh.connect(hostname=hostname, username=username, key_filename=key_filename)
+        scopy = scp.SCPClient(ssh.get_transport())
+        src = u'%s/%s' % (folder_dir, instance_name)
+        dst = u'~/'
+        scopy.put(src, dst, True)
+        ssh.close()
+        self.after_scp = True
 
         if depends:
             while True:
@@ -106,6 +123,7 @@ class InstanceProfile(threading.Thread):
         lock_on_init.release()
 
         print(u'complete %s' % uuid)
+        op.close_ssh(uuid)
 
     def stop(self):
         self.__running = False
@@ -243,6 +261,17 @@ class DeployVersion1():
             prev_before_init_count = len(self.__before_init)
             self.__lock_before_init.release()
             pending_count = 0
+
+            while True:
+                all_after_scp = True
+                for instance_profile in self.__instance_profile_list:
+                    if not instance_profile.after_scp:
+                        all_after_scp = False
+                        break
+                if all_after_scp:
+                    break
+                else:
+                    time.sleep(1)
 
             while True:
                 self.__lock_before_init.acquire(True)
