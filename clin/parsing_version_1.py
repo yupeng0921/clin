@@ -7,9 +7,18 @@ import os
 import yaml
 import time
 import types
+import threading
 from jinja2 import Template, Environment, FileSystemLoader
 import paramiko
 import scp
+
+def get_cur_info():
+    """Return the frame object for the caller's stack frame."""
+    try:
+        raise Exception
+    except:
+        f = sys.exc_info()[2].tb_frame.f_back
+        return str((f.f_code.co_name, f.f_lineno))
 
 productor_dict = {}
 import aws_operation
@@ -23,15 +32,83 @@ class Instance():
         for attr in attrs:
             self.__dict__[attr] = u'$$%s.%s$$' % (uuid, attr)
 
-class RunInit():
-    def __init__(self, uuid, name, hostname, username, key_filename, depends, parameters):
+class InstanceProfile(threading.Thread):
+    def __init__(self, uuid, folder_dir, instance_name, hostname, username, key_filename, depends, parameters, op, \
+                     lock_before_init, lock_on_init, lock_after_init, \
+                     before_init, on_init, after_init):
         self.uuid = uuid
-        self.name = name
+        self.instance_name = instance_name
+        self.folder_dir = folder_dir
         self.hostname = hostname
         self.username = username
         self.key_filename = key_filename
         self.depends = depends
         self.parameters = parameters
+        self.op = op
+        self.lock_before_init = lock_before_init
+        self.lock_on_init = lock_on_init
+        self.lock_after_init = lock_after_init
+        self.before_init = before_init
+        self.on_init = on_init
+        self.after_init = after_init
+        self.__running = True
+        threading.Thread.__init__(self, name=uuid)
+
+    def run(self):
+        uuid = self.uuid
+        instance_name = self.instance_name
+        folder_dir = self.folder_dir
+        hostname = self.hostname
+        username = self.username
+        key_filename = self.key_filename
+        depends = self.depends
+        parameters = self.parameters
+        op = self.op
+        lock_before_init = self.lock_before_init
+        lock_on_init = self.lock_on_init
+        lock_after_init = self.lock_after_init
+        before_init = self.before_init
+        on_init = self.on_init
+        after_init = self.after_init
+
+        print(u'scp %s' % uuid)
+
+        if depends:
+            while True:
+                lock_after_init.acquire(True)
+                can_init = True
+                for dep in depends:
+                    if dep not in after_init:
+                        can_init = False
+                        break
+                lock_after_init.release()
+                if can_init:
+                    break
+                else:
+                    if not self.__running:
+                        return
+                    time.sleep(1)
+
+        lock_before_init.acquire(True)
+        lock_on_init.acquire(True)
+        before_init.remove(uuid)
+        on_init.append(uuid)
+        lock_on_init.release()
+        lock_before_init.release()
+
+        print(u'do init %s' % uuid)
+
+        lock_on_init.acquire(True)
+        lock_after_init.acquire(True)
+        on_init.remove(uuid)
+        after_init.append(uuid)
+        lock_after_init.release()
+        lock_on_init.release()
+
+        print(u'complete %s' % uuid)
+
+    def stop(self):
+        self.__running = False
 
 class DeployVersion1():
     __parameter_dict = {}
@@ -144,8 +221,8 @@ class DeployVersion1():
             print(u'launching resources')
             self.__launch_group(resources_template[u'Resources'], stack_name, op)
             print(u'waiting resources')
-            for uuid in self.__uuid_list:
-                op.wait_instance(uuid, 0)
+            # for uuid in self.__uuid_list:
+            #     op.wait_instance(uuid, 0)
             self.__template_dir = template_dir
             self.__op = op
             self.__render_dict = dict(self.__render_dict, **self.__parameter_dict)
@@ -153,9 +230,44 @@ class DeployVersion1():
             self.__template_dir = template_dir
             self.__env = Environment(loader = loader)
             print(u'initing instances')
-            self.__not_init = []
-            self.__already_init = []
+            self.__before_init = []
+            self.__on_init = []
+            self.__after_init = []
+            self.__lock_before_init = threading.Lock()
+            self.__lock_on_init = threading.Lock()
+            self.__lock_after_init = threading.Lock()
+            self.__instance_profile_list = []
             self.__init_instances(resources_template[u'Resources'], stack_name, op)
+
+            self.__lock_before_init.acquire(True)
+            prev_before_init_count = len(self.__before_init)
+            self.__lock_before_init.release()
+            pending_count = 0
+
+            while True:
+                self.__lock_before_init.acquire(True)
+                before_init_count = len(self.__before_init)
+                self.__lock_before_init.release()
+                self.__lock_on_init.acquire(True)
+                on_init_count = len(self.__on_init)
+                self.__lock_on_init.release()
+                if before_init_count == 0 and on_init_count == 0:
+                    break
+                elif on_init_count == 0 and before_init_count == prev_before_init_count:
+                    pending_count += 1
+                else:
+                    pending_count = 0
+                prev_before_init_count = before_init_count
+                if pending_count >= 10:
+                    for instance_profile in self.__instance_profile_list:
+                        instance_profile.stop()
+                    self.__lock_before_init.acquire(True)
+                    before_init = list(self.__before_init)
+                    self.__lock_before_init.release()
+                    raise Exception(u'seems circle dependency %s' % before_init)
+                else:
+                    time.sleep(1)
+            return
             while len(self.__not_init) > 0:
                 tmp_list = []
                 for run_init in self.__not_init:
@@ -384,31 +496,12 @@ class DeployVersion1():
                     op.set_instance_sg(hierarchy1, sg_rules)
                     username, key_filename = op.get_login_user(hierarchy1)
                     hostname = op.get_public_ip(hierarchy1)
-                    op.open_ssh(hierarchy1)
-                    ssh=paramiko.SSHClient()
-                    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                    retry = 100
-                    while retry > 0:
-                        try:
-                            ssh.connect(hostname=hostname, username=username, key_filename=key_filename)
-                        except Exception, e:
-                            time.sleep(3)
-                        else:
-                            break
-                        retry -= 1
-                    if retry == 0:
-                        print(u'hostname=%s' % hostname)
-                        print(u'username=%s' % username)
-                        print(u'key_filename=%s' % key_filename)
-                        ssh.connect(hostname=hostname, username=username, key_filename=key_filename)
-                    scopy = scp.SCPClient(ssh.get_transport())
-                    src = u'%s/%s' % (self.__template_dir, name)
-                    dst = u'~/'
-                    scopy.put(src, dst, True)
-                    ssh.close()
-                    op.close_ssh(hierarchy1)
-                    run_init = RunInit(hierarchy1, name, hostname, username, key_filename, deps, init_parameters)
-                    self.__not_init.append(run_init)
+                    self.__before_init.append(hierarchy1)
+                    instance_profile = InstanceProfile(hierarchy1, self.__template_dir, name, hostname, username, key_filename, deps, init_parameters, op, \
+                                                      self.__lock_before_init, self.__lock_on_init, self.__lock_after_init, \
+                                                      self.__before_init, self.__on_init, self.__after_init)
+                    self.__instance_profile_list.append(instance_profile)
+                    instance_profile.start()
 
     def __explain(self, param):
         if type(param) is not types.StringType and type(param) is not types.UnicodeType:

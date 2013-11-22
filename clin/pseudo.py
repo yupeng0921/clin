@@ -19,16 +19,28 @@ class PseudoOperation():
         print(os_name)
         print(u'')
 
+    def set_instance_sg(self, uuid, sg_rules):
+        pass
+
     def wait_instance(self, uuid, timeout):
         print(u'wait instance:')
         print(uuid)
         print(timeout)
+
+    def get_login_user(self, uuid):
+        return (u'root', u'~/.clin/pseudo/pseudo.pem')
 
     def get_public_ip(self, uuid):
         return u'%s:pub' % uuid
 
     def get_private_ip(self, uuid):
         return u'%s:pri' % uuid
+
+    def open_ssh(self, uuid):
+        pass
+
+    def close_ssh(self, uuid):
+        pass
 
     def terminate_instance(self, uuid):
         pass
