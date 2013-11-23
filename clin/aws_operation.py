@@ -288,7 +288,7 @@ class AwsOperation(CloudOperation):
             pem_file = u'%s/%s.pem' % (self.__stack_name, self.__stack_name)
             file_list.append(pem_file)
             for k in bucket.list():
-                if k in file_list:
+                if k.key in file_list:
                     k.delete()
         try:
             keys=conn.get_all_key_pairs(keynames=self.__stack_name)
