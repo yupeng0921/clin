@@ -9,9 +9,12 @@ import time
 import types
 import yaml
 import shutil
+import hashlib
 
 try:
     import boto.ec2
+    import boto.s3
+    from boto.s3.key import Key
 except ImportError, e:
     load_boto = False
 else:
@@ -25,6 +28,7 @@ class AwsOperation(CloudOperation):
     __sg_prefix = u'Security Group for '
     __key_pair = None
     __has_ssh = {}
+    __owner_id = None
 
     def __init__(self, stack_name, conf_dir, only_dump, input_param_dict):
         global load_boto
@@ -217,7 +221,10 @@ class AwsOperation(CloudOperation):
         filters = {u'tag:Stack':self.__stack_name}
         volume_ids = []
         reservations = conn.get_all_instances(filters = filters)
+        owner_id = None
         for r in reservations:
+            if not owner_id:
+                owner_id = r.owner_id
             i = r.instances[0]
             devs = i.block_device_mapping
             for dev in devs:
@@ -251,12 +258,6 @@ class AwsOperation(CloudOperation):
         for sg in sgs:
             for rule in sg.rules:
                 for grant in rule.grants:
-                    # sg.revoke(rule.ip_protocol, rule.from_port, rule.to_port, grant.cidr_ip, grant)
-                    # print(rule.ip_protocol)
-                    # print(rule.from_port)
-                    # print(rule.to_port)
-                    # print(grant.cidr_ip)
-                    # print(grant.group_id)
                     if grant.group_id:
                         sg.revoke(rule.ip_protocol, rule.from_port, rule.to_port, grant.cidr_ip, grant)
                     else:
@@ -277,6 +278,18 @@ class AwsOperation(CloudOperation):
             if retry == 0:
                 sg.delete()
 
+        if owner_id:
+            s3_conn = boto.s3.connect_to_region(self.__region)
+            md5 = hashlib.md5()
+            md5.update(owner_id)
+            bucket_name = u'clin.%s.%s' % (self.__region, md5.hexdigest())
+            bucket = s3_conn.get_bucket(bucket_name)
+            file_list = []
+            pem_file = u'%s/%s.pem' % (self.__stack_name, self.__stack_name)
+            file_list.append(pem_file)
+            for k in bucket.list():
+                if k in file_list:
+                    k.delete()
         try:
             keys=conn.get_all_key_pairs(keynames=self.__stack_name)
         except Exception, e:
@@ -313,6 +326,11 @@ class AwsOperation(CloudOperation):
         conn.authorize_security_group(uuid, ip_protocol = u'tcp', \
                                           from_port = u'22', to_port = u'22', \
                                           cidr_ip = u'0.0.0.0/0')
+        sgs=conn.get_all_security_groups(groupnames=uuid)
+        for sg in sgs:
+            if sg.owner_id:
+                self.__owner_id = sg.owner_id
+                return
 
     def close_ssh(self, uuid):
         if uuid not in self.__has_ssh:
@@ -331,3 +349,21 @@ class AwsOperation(CloudOperation):
                             except Exception, e:
                                 pass
                             return
+
+    def save_to_remote(self):
+        if not self.__owner_id:
+            raise Exception(u'no owner id')
+        md5 = hashlib.md5()
+        md5.update(self.__owner_id)
+        bucket_name = u'clin.%s.%s' % (self.__region, md5.hexdigest())
+        conn=boto.s3.connect_to_region(self.__region)
+        try:
+            bucket = conn.create_bucket(bucket_name, location=self.__region)
+        except Exception, e:
+            bucket = conn.get_bucket(bucket_name)
+        else:
+            print(u'create new bucket: %s\n' % bucket)
+        k = Key(bucket)
+        k.key = u'%s/%s.pem' % (self.__stack_name, self.__stack_name)
+        k.set_contents_from_filename(self.__key_pair_path)
+        os.remove(self.__key_pair_path)

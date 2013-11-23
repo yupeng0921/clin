@@ -321,6 +321,7 @@ class DeployVersion1():
                 else:
                     time.sleep(1)
 
+        op.save_to_remote()
         outputs_string = u''
         with open(u'%s/init.yml' % template_dir, u'r') as f:
             start_flag = False

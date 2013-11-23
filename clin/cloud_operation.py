@@ -47,3 +47,6 @@ class CloudOperation():
     @abstractmethod
     def return_all_configure(self):
         pass
+    @abstractmethod
+    def save_to_remote(self):
+        pass
