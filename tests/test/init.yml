@@ -1,63 +1,51 @@
 Version: 1
 
 Parameters:
-  EnableShare:
-    Description: enable share
+  EnableGroupA:
+    Description: enablsh group A
     Type: ParameterGroup
-    Default: False
+    Default: True
     Members:
-      SharedNumber:
-        Description: number of share group
-        Type: Parameter
-        Default: 3
-        MinValue: 1
-        DisableValue: 1
-      ConfigNumber:
-        Description: number of config server
-        Type: Parameter
-        Default: 3
-        MinValue: 1
-        DisableValue: 0
-      RouterNumber:
-        Description: number of router server
+      GroupANumber:
+        Description: group A number
         Type: Parameter
         Default: 2
         MinValue: 1
         DisableValue: 0
-  SecondaryNumber:
-    Description: secondary server per replica
-    Type: Parameter
-    Default: 2
-    MinValue: 0
-    AllowedValues: [0, 2, 4, 6]
+      InstanceXNumber:
+        Description:  instance X number
+        Type: Parameter
+        Default: 2
+        MinValue: 1
+        DisableValue: 0
   ClientCidr:
-    Description: client cidr range want to allowed
+    Description: client cidr
     Type: Parameter
     Default: 0.0.0.0/0
 
 Resources:
-  SharedGroup:
+  GroupA:
     Type: InstanceGroup
-    Description: group for shared
-    Number: SharedNumber
+    Description: group A
+    Number: {{ GroupANumber }}
     Members:
-      ReplicaPrimary:
+      InstanceX:
         Type: Instance
-        Description: primary instance in replica
+        Description: instance X
+        Number: {{ InstanceXNumber }}
+        OSName: centos
+      InstanceY:
+        Type: Instance
+        Description: instance Y
         Number: 1
         OSName: centos
-      ReplicaSecondary:
-        Type: Instance
-        Description: secondary instance in replica
-        Number: SecondaryNumber
-        OSName: centos
-  ConfigInstance:
+  InstanceZ:
     Type: Instance
-    Description: config instance
-    Number: ConfigNumber
+    Description: instance Z
+    Number: 1
     OSName: centos
-  RouterInstance:
-    Type: Instance
-    Description: router instance
-    Number: RouterNumber
-    OSName: centos
+
+Outputs:
+  {% for ins in InstanceZ %}
+  - {{ ins.public_ip }}
+  {% endfor %}

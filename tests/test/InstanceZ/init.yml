@@ -1,0 +1,14 @@
+SecurityGroupRules:
+  - tcp 80 {{ ClientCidr }}
+
+InitParameters:
+  - {{ GroupANumber }}
+  {% for ins in InstanceY %}
+  - {{ ins.uuid }}
+  - {{ ins.private_ip }}
+  {% endfor %}
+
+Depends:
+  {% for ins in InstanceY %}
+  - {{ ins.uuid }}
+  {% endfor %}

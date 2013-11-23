@@ -1,0 +1,16 @@
+SecurityGroupRules:
+  {% for ins in InstanceZ %}
+  - tcp 80 {{ ins.private_ip }}/32
+  {% endfor %}
+
+InitParameters:
+  - {{ InstanceXNumber }}
+  {% for ins in InstanceX %}
+  - {{ ins.uuid }}
+  - {{ ins.private_ip }}
+  {% endfor %}
+
+Depends:
+  {% for ins in InstanceX %}
+  - {{ ins.uuid }}
+  {% endfor %}

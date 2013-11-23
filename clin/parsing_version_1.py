@@ -27,7 +27,7 @@ class Instance():
 class InstanceProfile(threading.Thread):
     def __init__(self, uuid, folder_dir, instance_name, hostname, username, key_filename, depends, parameters, op, \
                      lock_before_init, lock_on_init, lock_after_init, \
-                     before_init, on_init, after_init):
+                     before_init, on_init, after_init, lock_op):
         self.uuid = uuid
         self.instance_name = instance_name
         self.folder_dir = folder_dir
@@ -43,6 +43,7 @@ class InstanceProfile(threading.Thread):
         self.before_init = before_init
         self.on_init = on_init
         self.after_init = after_init
+        self.lock_op = lock_op
         self.__running = True
         self.after_scp = False
         threading.Thread.__init__(self, name=uuid)
@@ -57,6 +58,7 @@ class InstanceProfile(threading.Thread):
         depends = self.depends
         parameters = self.parameters
         op = self.op
+        lock_op = self.lock_op
         lock_before_init = self.lock_before_init
         lock_on_init = self.lock_on_init
         lock_after_init = self.lock_after_init
@@ -64,9 +66,11 @@ class InstanceProfile(threading.Thread):
         on_init = self.on_init
         after_init = self.after_init
 
+        lock_op.acquire(True)
         op.open_ssh(uuid)
+        lock_op.release()
 
-        print(u'scp %s' % uuid)
+        print(u'connect ssh start %s' % uuid)
         ssh=paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         retry = 100
@@ -82,14 +86,18 @@ class InstanceProfile(threading.Thread):
             print(u'hostname=%s' % hostname)
             print(u'username=%s' % username)
             print(u'key_filename=%s' % key_filename)
-        ssh.connect(hostname=hostname, username=username, key_filename=key_filename)
+            ssh.connect(hostname=hostname, username=username, key_filename=key_filename)
+        print(u'connect ssh stop %s' % uuid)
+        print(u'scp start %s' % uuid)
         scopy = scp.SCPClient(ssh.get_transport())
         src = u'%s/%s' % (folder_dir, instance_name)
         dst = u'~/'
         scopy.put(src, dst, True)
         ssh.close()
+        print(u'scp stop %s' % uuid)
         self.after_scp = True
 
+        print(u'depends: %s %s' % (depends, uuid))
         if depends:
             while True:
                 lock_after_init.acquire(True)
@@ -113,7 +121,20 @@ class InstanceProfile(threading.Thread):
         lock_on_init.release()
         lock_before_init.release()
 
-        print(u'do init %s' % uuid)
+        print(u'do init start %s' % uuid)
+        cmd = u'bash ~/%s/init.sh' % instance_name
+        if username != u'root':
+            cmd = u'sudo %s' % cmd
+        for p in parameters:
+            cmd = u'%s %s' % (cmd, p)
+        ssh.connect(hostname=hostname, username=username, key_filename=key_filename)
+        (stdin, stdout, stderr) = ssh.exec_command(cmd, timeout=6000)
+        ret = stdout.read()
+        ret = stderr.read()
+        stdout.close()
+        stderr.close()
+        ssh.close()
+        print(u'do init stop %s' % uuid)
 
         lock_on_init.acquire(True)
         lock_after_init.acquire(True)
@@ -122,8 +143,10 @@ class InstanceProfile(threading.Thread):
         lock_after_init.release()
         lock_on_init.release()
 
-        print(u'complete %s' % uuid)
+        lock_op.acquire(True)
         op.close_ssh(uuid)
+        lock_op.release()
+        print(u'complete %s' % uuid)
 
     def stop(self):
         self.__running = False
@@ -132,6 +155,7 @@ class DeployVersion1():
     __parameter_dict = {}
     __uuid_dict = {}
     __instance_name_list = []
+    __lock_op = threading.Lock()
     def __init__(self, template_dir, stack_name, productor, region, configure_file, \
                      use_default, dump_configure, clin_default_dir):
         input_parameter_dict = {}
@@ -296,46 +320,6 @@ class DeployVersion1():
                     raise Exception(u'seems circle dependency %s' % before_init)
                 else:
                     time.sleep(1)
-            return
-            while len(self.__not_init) > 0:
-                tmp_list = []
-                for run_init in self.__not_init:
-                    can_run = True
-                    if run_init.depends:
-                        for dep in run_init.depends:
-                            if dep not in self.__already_init:
-                                can_run = False
-                                break
-                    if can_run:
-                        ssh=paramiko.SSHClient()
-                        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                        hostname = run_init.hostname
-                        username = run_init.username
-                        key_filename = run_init.key_filename
-                        cmd = u'bash ~/%s/init.sh' % run_init.name
-                        if username != u'root':
-                            cmd = u'sudo %s' % cmd
-                        for p in run_init.parameters:
-                            cmd = u'%s %s' % (cmd, p)
-                        print(hostname)
-                        print(username)
-                        print(key_filename)
-                        print(cmd)
-                        ssh.connect(hostname=hostname, username=username, key_filename=key_filename)
-                        (stdin, stdout, stderr) = ssh.exec_command(cmd, timeout=6000)
-                        print("stdout:")
-                        print(stdout.read())
-                        print("stderr:")
-                        print(stderr.read())
-                        stdout.close()
-                        stderr.close()
-                        ssh.close()
-                        self.__already_init.append(run_init.uuid)
-                        tmp_list.append(run_init)
-                if not tmp_list:
-                    raise Exception('can not init any more')
-                for run_init in tmp_list:
-                    self.__not_init.remove(run_init)
 
         outputs_string = u''
         with open(u'%s/init.yml' % template_dir, u'r') as f:
@@ -509,7 +493,6 @@ class DeployVersion1():
                             rule = self.__explain(rule)
                             if rule:
                                 sg_rules.append(rule)
-                    sg_rules.append(u'tcp 22 0.0.0.0/0')
                     init_parameters = []
                     if u'InitParameters' in c:
                         for param in c[u'InitParameters']:
@@ -522,13 +505,18 @@ class DeployVersion1():
                             dep = self.__explain(dep)
                             if dep:
                                 deps.append(dep)
+                    self.__lock_op.acquire(True)
                     op.set_instance_sg(hierarchy1, sg_rules)
                     username, key_filename = op.get_login_user(hierarchy1)
                     hostname = op.get_public_ip(hierarchy1)
+                    self.__lock_op.release()
                     self.__before_init.append(hierarchy1)
-                    instance_profile = InstanceProfile(hierarchy1, self.__template_dir, name, hostname, username, key_filename, deps, init_parameters, op, \
-                                                      self.__lock_before_init, self.__lock_on_init, self.__lock_after_init, \
-                                                      self.__before_init, self.__on_init, self.__after_init)
+                    instance_profile = InstanceProfile(hierarchy1, \
+                                                           self.__template_dir, name, hostname, username, key_filename, \
+                                                           deps, init_parameters, op, \
+                                                           self.__lock_before_init, self.__lock_on_init, self.__lock_after_init, \
+                                                           self.__before_init, self.__on_init, self.__after_init, \
+                                                           self.__lock_op)
                     self.__instance_profile_list.append(instance_profile)
                     instance_profile.start()
 
@@ -604,9 +592,15 @@ class DeployVersion1():
 
         if approve:
             if attr == u'private_ip':
-                return self.__op.get_private_ip(ori_uuid)
+                self.__lock_op.acquire(True)
+                private_ip = self.__op.get_private_ip(ori_uuid)
+                self.__lock_op.release()
+                return private_ip
             elif attr == u'public_ip':
-                return self.__op.get_public_ip(ori_uuid)
+                self.__lock_op.acquire(True)
+                public_ip = self.__op.get_public_ip(ori_uuid)
+                self.__lock_op.release()
+                return public_ip
             elif attr == u'uuid':
                 return ori_uuid
             else:

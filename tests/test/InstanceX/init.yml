@@ -1,0 +1,4 @@
+SecurityGroupRules:
+  {% for ins in InstanceY %}
+  - tcp 80 {{ ins.private_ip }}/32
+  {% endfor %}

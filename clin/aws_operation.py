@@ -24,6 +24,7 @@ class AwsOperation(CloudOperation):
     __uuid_to_name = {}
     __sg_prefix = u'Security Group for '
     __key_pair = None
+    __has_ssh = {}
 
     def __init__(self, stack_name, conf_dir, only_dump, input_param_dict):
         global load_boto
@@ -250,16 +251,19 @@ class AwsOperation(CloudOperation):
         for sg in sgs:
             for rule in sg.rules:
                 for grant in rule.grants:
-                    sg.revoke(rule.ip_protocol, rule.from_port, rule.to_port, grant.cidr_ip, grant)
+                    # sg.revoke(rule.ip_protocol, rule.from_port, rule.to_port, grant.cidr_ip, grant)
                     # print(rule.ip_protocol)
                     # print(rule.from_port)
                     # print(rule.to_port)
                     # print(grant.cidr_ip)
                     # print(grant.group_id)
-                    # if grant.group_id:
-                    #     sg.revoke(rule.ip_protocol, rule.from_port, rule.to_port, grant.cidr_ip, grant)
-                    # else:
-                    #     sg.revoke(rule.ip_protocol, rule.from_port, rule.to_port, grant.cidr_ip, None)
+                    if grant.group_id:
+                        sg.revoke(rule.ip_protocol, rule.from_port, rule.to_port, grant.cidr_ip, grant)
+                    else:
+                        try:
+                            sg.revoke(rule.ip_protocol, rule.from_port, rule.to_port, grant.cidr_ip, None)
+                        except Exception, e:
+                            pass
         for sg in sgs:
             retry = 5
             while retry > 0:
@@ -296,6 +300,34 @@ class AwsOperation(CloudOperation):
         return (u'root', self.__key_pair_path)
 
     def open_ssh(self, uuid):
-        pass
+        conn = boto.ec2.connect_to_region(self.__region)
+        sgs=conn.get_all_security_groups(groupnames=uuid)
+        for sg in sgs:
+            for rule in sg.rules:
+                if rule.ip_protocol == u'tcp' and rule.from_port == u'22' and rule.to_port == u'22':
+                    for grant in rule.grants:
+                        if grant.cidr_ip == u'0.0.0.0/0':
+                            self.__has_ssh[uuid] = True
+                            return
+        self.__has_ssh[uuid] = False
+        conn.authorize_security_group(uuid, ip_protocol = u'tcp', \
+                                          from_port = u'22', to_port = u'22', \
+                                          cidr_ip = u'0.0.0.0/0')
+
     def close_ssh(self, uuid):
-        pass
+        if uuid not in self.__has_ssh:
+            raise Exception(u'open ssh not called')
+        if self.__has_ssh[uuid]:
+            return
+        conn = boto.ec2.connect_to_region(self.__region)
+        sgs=conn.get_all_security_groups(groupnames=uuid)
+        for sg in sgs:
+            for rule in sg.rules:
+                if rule.ip_protocol == u'tcp' and rule.from_port == u'22' and rule.to_port == u'22':
+                    for grant in rule.grants:
+                        if grant.cidr_ip == u'0.0.0.0/0':
+                            try:
+                                sg.revoke(rule.ip_protocol, rule.from_port, rule.to_port, grant.cidr_ip, None)
+                            except Exception, e:
+                                pass
+                            return
