@@ -136,11 +136,16 @@ class AwsOperation(CloudOperation):
         os_id = self.__os_mapping[self.__region][os_name]
         instance_type = self.__name_to_conf[name][u'instance_type']
         volume_size = self.__name_to_conf[name][u'volume_size']
+        root_dev = boto.ec2.blockdevicemapping.BlockDeviceType(connection=conn, size=volume_size)
+        bdm = boto.ec2.blockdevicemapping.BlockDeviceMapping(connection=conn)
+        root_name = conn.get_all_images(image_ids=os_id)[0].block_device_mapping.keys()[0]
+        bdm[root_name] = root_dev
         retry = 5
         while retry >= 0:
             try:
                 r = conn.run_instances(image_id=os_id, key_name = self.__key_pair.name, \
-                                           instance_type=instance_type, security_group_ids = [sg.id])
+                                           instance_type=instance_type, security_group_ids = [sg.id], \
+                                           block_device_map=bdm)
             except Exception, e:
                 time.sleep(1)
             else:
@@ -148,7 +153,8 @@ class AwsOperation(CloudOperation):
             retry -= 1
         if retry == 0:
             r = conn.run_instances(image_id=os_id, key_name = self.__key_pair.name, \
-                                       instance_type=instance_type, security_group_ids = [sg.id])
+                                       instance_type=instance_type, security_group_ids = [sg.id], \
+                                       block_device_map=bdm)
 
         instance_id = r.instances[0].id
         tags = {}
