@@ -60,8 +60,7 @@ class ApiV1Client():
     def delete_user(self, username, password):
         url = u'%s/users/%s' % (self.base, username)
         auth = (username, password)
-        headers = {'content-type': 'application/json'}
-        js = ClinRequests.delete(url, headers=headers, auth=auth, verify=False)
+        js = ClinRequests.delete(url, auth=auth, verify=False)
         return js
 
     def create_package(self, username, password, packagename):
@@ -75,15 +74,13 @@ class ApiV1Client():
 
     def get_packages(self, username):
         url = u'%s/users/%s' % (self.base, username)
-        headers = {'content-type': 'application/json'}
-        js = ClinRequests.get(url, headers=headers, verify=False)
+        js = ClinRequests.get(url, verify=False)
         return js
 
     def delete_package(self, username, password, packagename):
         url = u'%s/users/%s/%s' % (self.base, username, packagename)
         auth = (username, password)
-        headers = {'content-type': 'application/json'}
-        js = ClinRequests.delete(url, headers=headers, auth=auth, verify=False)
+        js = ClinRequests.delete(url, auth=auth, verify=False)
         return js
 
     def create_version(self, username, password, packagename, versionnumber, description, filepath):
@@ -99,26 +96,26 @@ class ApiV1Client():
 
     def get_versions(self, username, packagename):
         url = u'%s/users/%s/%s' % (self.base, username, packagename)
-        headers = {'content-type': 'application/json'}
-        js = ClinRequests.get(url, headers=headers, verify=False)
+        js = ClinRequests.get(url, verify=False)
         return js
 
     def get_version(self, username, packagename, versionnumber):
         url = u'%s/users/%s/%s/%s' % (self.base, username, packagename, versionnumber)
-        headers = {'content-type': 'application/json'}
-        js = ClinRequests.get(url, headers=headers, verify=False)
+        js = ClinRequests.get(url, verify=False)
         return js
 
     def delete_version(self, username, password, packagename, versionnumber):
         url = u'%s/users/%s/%s/%s' % (self.base, username, packagename, versionnumber)
         auth = (username, password)
-        headers = {'content-type': 'application/json'}
-        js = ClinRequests.delete(url, headers=headers, auth=auth, verify=False)
+        js = ClinRequests.delete(url, auth=auth, verify=False)
         return js
 
-    def get_all_packages(self):
+    def get_all_packages(self, packagename=None):
         url = u'%s/packages' % (self.base)
-        headers = {'content-type': 'application/json'}
+        if packagename:
+            headers = {u'X-packagename': packagename}
+        else:
+            headers = {}
         js = ClinRequests.get(url, headers=headers, verify=False)
         return js
 
@@ -150,6 +147,9 @@ if __name__ == u'__main__':
     print(ret)
 
     ret = client.get_all_packages()
+    print(ret)
+
+    ret = client.get_all_packages(packagename)
     print(ret)
 
     ret = client.delete_version(username, password, packagename, versionnumber)

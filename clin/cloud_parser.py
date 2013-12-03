@@ -150,6 +150,139 @@ def clin_unregister(args):
     ret = client.delete_user(username, password)
     print(ret)
 
+def clin_create(args):
+    clin_default_dir = get_default_dir(args)
+    packagename = args.packagename
+    username = args.username
+    password = args.password
+    apiserver = None
+    conf_path = u'%s/conf.yml' % clin_default_dir
+    if os.path.exists(conf_path):
+        with open(conf_path, u'r') as f:
+            t = yaml.safe_load(f)
+        if u'apiserver' in t:
+            apiserver = t[u'apiserver']
+            if not username:
+                if u'username' in t:
+                    username = t[u'username']
+            if not password:
+                if u'password' in t:
+                    password = t[u'password']
+                elif u'password_base64' in t:
+                    password = base64.decodestring(t[u'password_base64'])
+    if not apiserver:
+        apiserver = default_api_server
+    if not username:
+        username = raw_input(u'username:')
+    if not password:
+        password = getpass.getpass(u'Enter password:')
+    client = ApiV1Client(apiserver)
+    ret = client.create_package(username, password, packagename)
+    print(ret)
+
+def clin_upload(args):
+    clin_default_dir = get_default_dir(args)
+    packagename = args.packagename
+    versionnumber = args.versionnumber
+    description = args.description
+    path = args.path
+    username = args.username
+    password = args.password
+    apiserver = None
+    conf_path = u'%s/conf.yml' % clin_default_dir
+    if os.path.exists(conf_path):
+        with open(conf_path, u'r') as f:
+            t = yaml.safe_load(f)
+        if u'apiserver' in t:
+            apiserver = t[u'apiserver']
+            if not username:
+                if u'username' in t:
+                    username = t[u'username']
+            if not password:
+                if u'password' in t:
+                    password = t[u'password']
+                elif u'password_base64' in t:
+                    password = base64.decodestring(t[u'password_base64'])
+    if not apiserver:
+        apiserver = default_api_server
+    if not username:
+        username = raw_input(u'username:')
+    if not password:
+        password = getpass.getpass(u'Enter password:')
+    if path[-1] == u'/':
+        path = path[0:-1]
+    filepath = path+u'.zip'
+    zip_dir(path, filepath)
+    client = ApiV1Client(apiserver)
+    ret = client.create_version(username, password, packagename, versionnumber, description, filepath)
+    os.remove(filepath)
+    print(ret)
+
+def clin_delete(args):
+    clin_default_dir = get_default_dir(args)
+    packagename = args.packagename
+    versionnumber = args.versionnumber
+    username = args.username
+    password = args.password
+    apiserver = None
+    conf_path = u'%s/conf.yml' % clin_default_dir
+    if os.path.exists(conf_path):
+        with open(conf_path, u'r') as f:
+            t = yaml.safe_load(f)
+        if u'apiserver' in t:
+            apiserver = t[u'apiserver']
+            if not username:
+                if u'username' in t:
+                    username = t[u'username']
+            if not password:
+                if u'password' in t:
+                    password = t[u'password']
+                elif u'password_base64' in t:
+                    password = base64.decodestring(t[u'password_base64'])
+    if not apiserver:
+        apiserver = default_api_server
+    if not username:
+        username = raw_input(u'username:')
+    if not password:
+        password = getpass.getpass(u'Enter password:')
+
+    client = ApiV1Client(apiserver)
+    if versionnumber:
+        ret = client.delete_version(username, password, packagename, versionnumber)
+    else:
+        ret = client.delete_package(username, password, packagename)
+    print(ret)
+
+def clin_list(args):
+    clin_default_dir = get_default_dir(args)
+    packagename = args.packagename
+    versionnumber = args.versionnumber
+    username = args.username
+    allusers = args.allusers
+    apiserver = None
+    conf_path = u'%s/conf.yml' % clin_default_dir
+    if os.path.exists(conf_path):
+        with open(conf_path, u'r') as f:
+            t = yaml.safe_load(f)
+        if u'apiserver' in t:
+            apiserver = t[u'apiserver']
+
+    client = ApiV1Client(apiserver)
+    if allusers == u'yes':
+        ret = client.get_users()
+    elif username:
+        ret = client.get_packages(username)
+    elif packagename:
+        ret = client.get_all_packages(packagename)
+        username = ret[0][u'username']
+        if versionnumber:
+            ret = client.get_version(username, packagename, versionnumber)
+        else:
+            ret = client.get_versions(username, packagename)
+    else:
+        ret = client.get_all_packages()
+    print(ret)
+
 def clin_deploy(args):
     clin_default_dir = get_default_dir(args)
 
@@ -217,28 +350,38 @@ shoud be unique per productor per region')
     parser_unregister.add_argument(u'--clin-default-dir', help=u'the default directory for configure file of clin program')
     parser_unregister.set_defaults(func=clin_unregister)
 
-    # parser_create = subparsers.add_parser(u'create', help=u'create a package on api server')
-    # parser_create.add_argument(u'--packagename', help=u'the package name you want to create', required=True)
-    # parser_create.add_argument(u'--username', help=u'user name of the package owner')
-    # parser_create.add_argument(u'--password', help=u'password of the user')
-    # parser_create.add_argument(u'--clin-default-dir', help=u'the default directory for configure file of clin program')
-    # parser_create.set_defaults(func=clin_create)
+    parser_create = subparsers.add_parser(u'create', help=u'create a package on api server')
+    parser_create.add_argument(u'--packagename', help=u'the package name you want to create', required=True)
+    parser_create.add_argument(u'--username', help=u'user name of the package owner')
+    parser_create.add_argument(u'--password', help=u'password of the user')
+    parser_create.add_argument(u'--clin-default-dir', help=u'the default directory for configure file of clin program')
+    parser_create.set_defaults(func=clin_create)
 
-    # parser_upload = subparsers.add_parser(u'upload', help=u'upload a specific version of a package')
-    # parser_upload.add_argument(u'--packagename', help=u'the package name for this version', required=True)
-    # parser_upload.add_argument(u'--versionnumber', help=u'the version number you want to upload, should be int or float', required=True)
-    # parser_upload.add_argument(u'--path', help=u'the directory path of this package version', required=True)
-    # parser_upload.add_argument(u'--username', help=u'user name of this package and version owner')
-    # parser_upload.add_argument(u'--password', help=u'password of the user')
-    # parser_upload.add_argument(u'--clin-default-dir', help=u'the default directory for configure file of clin program')
-    # parser_upload.set_defaults(func=clin_upload)
+    parser_upload = subparsers.add_parser(u'upload', help=u'upload a specific version of a package')
+    parser_upload.add_argument(u'--packagename', help=u'the package name for this version', required=True)
+    parser_upload.add_argument(u'--versionnumber', help=u'the version number you want to upload, should be int or float', required=True)
+    parser_upload.add_argument(u'--description', help=u'a short description', required=True)
+    parser_upload.add_argument(u'--path', help=u'the directory path of this package version', required=True)
+    parser_upload.add_argument(u'--username', help=u'user name of this package and version owner')
+    parser_upload.add_argument(u'--password', help=u'password of the user')
+    parser_upload.add_argument(u'--clin-default-dir', help=u'the default directory for configure file of clin program')
+    parser_upload.set_defaults(func=clin_upload)
 
-    # parser_delete = usbparsers.add_parser(u'delete', help=u'delete a specific version of a package or delete a package')
-    # parser_delete.add_argument(u'--packagename', help=u'package name you want to delete, should only delete a package after delete all the versions', required=True)
-    # parser_delete.add_argument(u'--versionnumber', help=u'the specific version you want to delete')
-    # parser_delete.add_argument(u'--username', help=u'user name')
-    # parser_delete.add_argument(u'--password', help=u'password')
-    # parser_delete.set_defaults(func=clin_delete)
+    parser_delete = subparsers.add_parser(u'delete', help=u'delete a specific version of a package or delete a package')
+    parser_delete.add_argument(u'--packagename', help=u'package name you want to delete, should only delete a package after delete all the versions', required=True)
+    parser_delete.add_argument(u'--versionnumber', help=u'the specific version you want to delete')
+    parser_delete.add_argument(u'--username', help=u'user name')
+    parser_delete.add_argument(u'--password', help=u'password')
+    parser_delete.add_argument(u'--clin-default-dir', help=u'the default directory for configure file of clin program')
+    parser_delete.set_defaults(func=clin_delete)
+
+    parser_list = subparsers.add_parser(u'list', help=u'list packages, versions, or users')
+    parser_list.add_argument(u'--packagename', help=u'if specific, list the specific package')
+    parser_list.add_argument(u'--versionnumber', help=u'if specific, list the specific version of the specific package')
+    parser_list.add_argument(u'--username', help=u'if specific, list the packages belong to the specific user')
+    parser_list.add_argument(u'--allusers', help=u'if set to yes, list all the users')
+    parser_list.add_argument(u'--clin-default-dir', help=u'the default directory for configure file of clin program')
+    parser_list.set_defaults(func=clin_list)
 
     args = parser.parse_args()
     args.func(args)
