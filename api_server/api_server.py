@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-from flask import Flask, request, url_for, json, abort, Response
+from flask import Flask, request, url_for, json, abort, Response, jsonify
 import boto
 import boto.s3
 from boto.s3.key import Key
@@ -75,6 +75,12 @@ class Backend():
 
     def delete_package(self, username, packagename):
         item = u'packages.%s' % packagename
+        item_v = u'%s.versionnumber' % item
+        ret = self.users.find_one({u'_id': username, item: {'$exists': True}}, {item_v: 1})
+        if u'packages' in ret and packagename in ret[u'packages']:
+            v = ret[u'packages'][packagename]
+            if v != []:
+                return u'package has versions'
         ret = self.users.update({u'_id':username, item:{u'$in':[[]]}}, {u'$unset':{item:1}})
         # the package may be deleted by previous delete, so only check err
         if ret[u'err'] != None:
@@ -161,8 +167,11 @@ class Backend():
         version[u'link'] = u'%s/%s-%s.zip' % (self.link_prefix, packagename, versionnumber)
         return version
 
-    def get_all_packages(self):
-        packages = self.packages.find()
+    def get_all_packages(self, packagename):
+        if packagename:
+            packages = self.packages.find({u'_id':packagename})
+        else:
+            packages = self.packages.find()
         ret_list = []
         for package in packages:
             package[u'packagename'] = package[u'_id']
@@ -391,7 +400,11 @@ def api_versionnumber(username, packagename, versionnumber):
 
 @app.route(u'/v1/packages', methods = [u'GET'])
 def api_packages():
-    data = backend.get_all_packages()
+    if u'X-packagename' in request.headers:
+        packagename = request.headers[u'X-packagename']
+    else:
+        packagename = None
+    data = backend.get_all_packages(packagename)
     if type(data) in [types.StringType, types.UnicodeType]:
         data = {u'reason': data}
         return make_resp(data, 500)
