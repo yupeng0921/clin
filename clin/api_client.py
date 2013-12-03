@@ -40,13 +40,13 @@ class ClinRequests():
 
 class ApiV1Client():
     def __init__(self, endpoint):
-        js = ClinRequests.get(endpoint)
+        js = ClinRequests.get(endpoint, verify=False)
         v1 = js[u'v1']
         self.base = u'%s%s' % (endpoint, v1)
 
     def get_users(self):
         url = u'%s/users' % self.base
-        js = ClinRequests.get(url)
+        js = ClinRequests.get(url, verify=False)
         return js
 
     def create_user(self, username, password):
@@ -54,14 +54,14 @@ class ApiV1Client():
         headers = {'content-type': 'application/json'}
         data = {u'username':username, u'password':password}
         data = json.dumps(data)
-        js = ClinRequests.post(url, data=data, headers=headers)
+        js = ClinRequests.post(url, data=data, headers=headers, verify=False)
         return js
 
     def delete_user(self, username, password):
         url = u'%s/users/%s' % (self.base, username)
         auth = (username, password)
         headers = {'content-type': 'application/json'}
-        js = ClinRequests.delete(url, headers=headers, auth=auth)
+        js = ClinRequests.delete(url, headers=headers, auth=auth, verify=False)
         return js
 
     def create_package(self, username, password, packagename):
@@ -70,20 +70,20 @@ class ApiV1Client():
         headers = {'content-type': 'application/json'}
         data = {u'packagename': packagename}
         data = json.dumps(data)
-        js = ClinRequests.post(url, data=data, headers=headers, auth=auth)
+        js = ClinRequests.post(url, data=data, headers=headers, auth=auth, verify=False)
         return js
 
     def get_packages(self, username):
         url = u'%s/users/%s' % (self.base, username)
         headers = {'content-type': 'application/json'}
-        js = ClinRequests.get(url, headers=headers)
+        js = ClinRequests.get(url, headers=headers, verify=False)
         return js
 
     def delete_package(self, username, password, packagename):
         url = u'%s/users/%s/%s' % (self.base, username, packagename)
         auth = (username, password)
         headers = {'content-type': 'application/json'}
-        js = ClinRequests.delete(url, headers=headers, auth=auth)
+        js = ClinRequests.delete(url, headers=headers, auth=auth, verify=False)
         return js
 
     def create_version(self, username, password, packagename, versionnumber, description, filepath):
@@ -94,36 +94,36 @@ class ApiV1Client():
         headers[u'X-versionnumber'] = versionnumber
         headers[u'X-description'] = description
         with open(filepath, u'rb') as f:
-            js = ClinRequests.post(url, data=f, headers=headers, auth=auth)
+            js = ClinRequests.post(url, data=f, headers=headers, auth=auth, verify=False)
         return js
 
     def get_versions(self, username, packagename):
         url = u'%s/users/%s/%s' % (self.base, username, packagename)
         headers = {'content-type': 'application/json'}
-        js = ClinRequests.get(url, headers=headers)
+        js = ClinRequests.get(url, headers=headers, verify=False)
         return js
 
     def get_version(self, username, packagename, versionnumber):
         url = u'%s/users/%s/%s/%s' % (self.base, username, packagename, versionnumber)
         headers = {'content-type': 'application/json'}
-        js = ClinRequests.get(url, headers=headers)
+        js = ClinRequests.get(url, headers=headers, verify=False)
         return js
 
     def delete_version(self, username, password, packagename, versionnumber):
         url = u'%s/users/%s/%s/%s' % (self.base, username, packagename, versionnumber)
         auth = (username, password)
         headers = {'content-type': 'application/json'}
-        js = ClinRequests.delete(url, headers=headers, auth=auth)
+        js = ClinRequests.delete(url, headers=headers, auth=auth, verify=False)
         return js
 
     def get_all_packages(self):
         url = u'%s/packages' % (self.base)
         headers = {'content-type': 'application/json'}
-        js = ClinRequests.get(url, headers=headers)
+        js = ClinRequests.get(url, headers=headers, verify=False)
         return js
 
 if __name__ == u'__main__':
-    client = ApiV1Client(u'http://127.0.0.1')
+    client = ApiV1Client(u'https://apitest.yupeng820921.tk')
     username = u'hank'
     password = u'123'
     packagename = u'packageA'
