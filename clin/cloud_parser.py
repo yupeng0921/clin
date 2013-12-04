@@ -283,7 +283,42 @@ def clin_list(args):
         ret = client.get_all_packages()
     print(ret)
 
-# def clin_download(args)
+def clin_download(args):
+    clin_default_dir = get_default_dir(args)
+    packagename = args.packagename
+    versionnumber = args.versionnumber
+    download_dir = args.path
+    if not versionnumber:
+        versionnumber = u'last'
+
+    apiserver = None
+    conf_path = u'%s/conf.yml' % clin_default_dir
+    if os.path.exists(conf_path):
+        with open(conf_path, u'r') as f:
+            t = yaml.safe_load(f)
+        if u'apiserver' in t:
+            apiserver = t[u'apiserver']
+
+    client = ApiV1Client(apiserver)
+    ret = client.get_all_packages(packagename)
+    username = ret[0][u'username']
+    ret = client.get_version(username, packagename, versionnumber)
+    download_link = ret[u'link']
+    r=urllib2.urlopen(download_link)
+    if not download_dir:
+        download_dir = u'./'
+    if not os.path.exists(download_dir):
+        os.mkdir(download_dir)
+    service_name = u'%s-%s' % (packagename, versionnumber)
+    download_name = service_name + u'.zip'
+    f=open(download_dir + download_name, u'wb')
+    f.write(r.read())
+    f.close()
+    if os.path.exists(download_dir+service_name):
+        shutil.rmtree(download_dir+service_name)
+    unzip_file(download_dir+download_name, download_dir+service_name)
+    os.remove(download_dir + download_name)
+
 def clin_deploy(args):
     clin_default_dir = get_default_dir(args)
 
@@ -384,12 +419,12 @@ shoud be unique per productor per region')
     parser_list.add_argument(u'--clin-default-dir', help=u'the default directory for configure file of clin program')
     parser_list.set_defaults(func=clin_list)
 
-    # parser_download = subparsers.add_parser(u'download', help=u'download package to local')
-    # parser_download.add_argument(u'--packagename', help=u'package want to download', required=True)
-    # parser_download.add_argument(u'--versionnumber', help=u'version want to download, if not specific, download the last version')
-    # parser_download.add_argument(u'--path', help=u'local directory to download')
-    # parser_download.add_argument(u'--clin-default-dir', help=u'the default directory for configure file of clin program')
-    # parser_download.set_defaults(clin_download)
+    parser_download = subparsers.add_parser(u'download', help=u'download package to local')
+    parser_download.add_argument(u'--packagename', help=u'package want to download', required=True)
+    parser_download.add_argument(u'--versionnumber', help=u'version want to download, if not specific, download the last version')
+    parser_download.add_argument(u'--path', help=u'local directory to download')
+    parser_download.add_argument(u'--clin-default-dir', help=u'the default directory for configure file of clin program')
+    parser_download.set_defaults(func=clin_download)
 
     args = parser.parse_args()
     args.func(args)
