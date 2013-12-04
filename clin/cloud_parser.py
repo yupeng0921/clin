@@ -48,31 +48,26 @@ def unzip_file(zipfilename, unziptodir):
 
 url_prefix = u'http://cloudinstall.yupeng820921.tk'
 download_prefix = url_prefix + u'/download/'
-def load_remote_template_file(service_name):
-    url = download_prefix + service_name
-    request = urllib2.Request(url)
-    opener = urllib2.build_opener()
-    download_link = opener.open(request).read()
-    r=urllib2.urlopen(download_link)
-    download_dir = u'/tmp/.clin/'
-    if not os.path.exists(download_dir):
-        os.mkdir(download_dir)
-    download_name = service_name + u'.zip'
-    f=open(download_dir + download_name, u'wb')
-    f.write(r.read())
-    f.close()
-    if os.path.exists(download_dir+service_name):
-        shutil.rmtree(download_dir+service_name)
-    unzip_file(download_dir+download_name, download_dir+service_name)
-    return download_dir+service_name
+class PseudoArgs():
+    pass
 
-def load_template(service_name):
+def load_remote_template_file(service_name, clin_default_dir):
+    args = PseudoArgs()
+    args.clin_default_dir = clin_default_dir
+    args.packagename = service_name
+    args.versionnumber = u'last'
+    download_dir = u'/tmp/.clin/'
+    args.path = download_dir
+    clin_download(args)
+    return u'%s%s-last' % (download_dir, service_name)
+
+def load_template(service_name, clin_default_dir):
     local_flag = u'file://'
     length = len(local_flag)
     if service_name[0:length] == local_flag:
         return service_name[length:]
     else:
-        return load_remote_template_file(service_name)
+        return load_remote_template_file(service_name, clin_default_dir)
 
 # def clin_upload(args):
 #     package_dir = args.package_dir
@@ -307,6 +302,8 @@ def clin_download(args):
     r=urllib2.urlopen(download_link)
     if not download_dir:
         download_dir = u'./'
+    elif download_dir[-1] != u'/':
+        download_dir = download_dir + u'/'
     if not os.path.exists(download_dir):
         os.mkdir(download_dir)
     service_name = u'%s-%s' % (packagename, versionnumber)
@@ -322,7 +319,7 @@ def clin_download(args):
 def clin_deploy(args):
     clin_default_dir = get_default_dir(args)
 
-    template_dir = load_template(args.name)
+    template_dir = load_template(args.name, clin_default_dir)
 
     with open(u'%s/init.yml' % template_dir, u'r') as f:
         first_line = f.next()
