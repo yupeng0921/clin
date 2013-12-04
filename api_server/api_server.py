@@ -149,7 +149,30 @@ class Backend():
         versions = ret['packages'][packagename]
         return versions
 
+    def get_last_version(self, username, packagename):
+        item = u'packages.%s' % packagename
+        item_v = u'%s.versionnumber' % item
+        item_s = u'%s.status' % item
+        ret = self.users.find_one({u'_id': username, item: {'$exists': True}})
+        last = None
+        versions = ret['packages'][packagename]
+        for version in versions:
+            if version[u'status'] != u'update':
+                continue
+            if not last:
+                last = version
+            elif version[u'versionnumber'] > last[u'versionnumber']:
+                last = version
+        if not last:
+            return u'no valid last version'
+        else:
+            version[u'link'] = u'%s/%s-%s.zip' % (self.link_prefix, packagename, version[u'versionnumber'])
+            return version
+
     def get_version(self, username, packagename, versionnumber):
+        if versionnumber == u'last':
+                return self.get_last_version(username, packagename)
+
         item = u'packages.%s' % packagename
         item_v = u'%s.versionnumber' % item
         item_ss = u'%s.$' % item
