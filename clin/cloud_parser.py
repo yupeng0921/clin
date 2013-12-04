@@ -283,6 +283,7 @@ def clin_list(args):
         ret = client.get_all_packages()
     print(ret)
 
+# def clin_download(args)
 def clin_deploy(args):
     clin_default_dir = get_default_dir(args)
 
@@ -382,6 +383,13 @@ shoud be unique per productor per region')
     parser_list.add_argument(u'--allusers', help=u'if set to yes, list all the users')
     parser_list.add_argument(u'--clin-default-dir', help=u'the default directory for configure file of clin program')
     parser_list.set_defaults(func=clin_list)
+
+    # parser_download = subparsers.add_parser(u'download', help=u'download package to local')
+    # parser_download.add_argument(u'--packagename', help=u'package want to download', required=True)
+    # parser_download.add_argument(u'--versionnumber', help=u'version want to download, if not specific, download the last version')
+    # parser_download.add_argument(u'--path', help=u'local directory to download')
+    # parser_download.add_argument(u'--clin-default-dir', help=u'the default directory for configure file of clin program')
+    # parser_download.set_defaults(clin_download)
 
     args = parser.parse_args()
     args.func(args)

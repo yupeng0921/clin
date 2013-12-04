@@ -146,6 +146,10 @@ if __name__ == u'__main__':
     ret = client.get_version(username, packagename, versionnumber)
     print(ret)
 
+    print(u'last:')
+    ret = client.get_version(username, packagename, u'last')
+    print(ret)
+
     ret = client.get_all_packages()
     print(ret)
 
