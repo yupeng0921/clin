@@ -126,22 +126,20 @@ class Deploy():
                     ret = verify_profile(profile)
                     if ret:
                         raise Exception(ret)
-                    self.conf_dict[u'Vendor'] = profile[u'Value']
-                    self.stage = u'region'
+                    self.stage = u'Region'
                     continue
                 else:
                     self.stage = u'getting_vendor'
                     return [profile]
-            elif self.stage == u'region':
-                vendor = self.conf_dict[u'Vendor']
+            elif self.stage == u'Region':
+                vendor = self.vendor
                 allowed_values = get_regions_by_vendor(vendor)
-                profile = generate_profile(u'region', u'String', u'region', allowed_values)
+                profile = generate_profile(u'Region', u'String', u'Region', allowed_values)
                 if self.region:
                     profile[u'Value'] = self.region
                     ret = verify_profile(profile)
                     if ret:
                         raise Exception(ret)
-                    self.conf_dict[u'region'] = profile[u'Value']
                     self.stage = u'parameters'
                     continue
                 else:
@@ -171,7 +169,7 @@ class Deploy():
                     self.stage = u'specialism'
                     continue
             elif self.stage == u'specialism':
-                 vendor = self.conf_dict[u'Vendor']
+                 vendor = self.vendor
                  profiles = get_specialism_by_vendor(vendor)
                  if profiles:
                      if self.configure_dict[u'Specialism']:
@@ -200,7 +198,7 @@ class Deploy():
             elif self.stage == u'instances':
                 if self.instances_stack:
                     instance_name = self.instances_stack.pop()
-                    vendor = self.conf_dict[u'Vendor']
+                    vendor = self.vendor
                     profiles = get_instance_profiles_by_vendor(vendor)
                     for profile in profiles:
                         profile[u'Name'] = u'%s %s' % (instance_name, profile[u'Name'])
@@ -239,16 +237,16 @@ class Deploy():
             ret = verify_profile(profile)
             if ret:
                 return ret
-            self.conf_dict[u'Vendor'] = profile[u'Value']
-            self.stage = u'region'
+            self.vendor = profile[u'Value']
+            self.stage = u'Region'
             return None
         elif self.stage == u'getting_region':
-            vendor = self.conf_dict[u'Vendor']
+            vendor = self.vendor
             profile = profiles[0]
             ret = verify_profile(profile)
             if ret:
                 return ret
-            self.conf_dict[u'region'] = profile[u'Value']
+            self.region = profile[u'Value']
             self.stage = u'parameters'
             return None
         elif self.stage == u'getting_parameter':
@@ -262,10 +260,9 @@ class Deploy():
             name = profile[u'Name']
             self.conf_dict[u'Parameters'][name] = profile[u'Value']
             self.stage = u'parameters'
-            print(self.stage)
             return None
         elif self.stage == u'getting_specialism':
-            vendor = self.conf_dict[u'Vendor']
+            vendor = self.vendor
             ret = verify_specialism_by_vendor(profiles, vendor)
             if ret:
                 return ret
@@ -277,7 +274,7 @@ class Deploy():
                 self.stage = u'instances'
                 return None
         elif self.stage == u'getting_instances':
-            vendor = self.conf_dict[u'Vendor']
+            vendor = self.vendor
             ret = verify_instance_profiles_by_vendor(profiles, vendor)
             if ret:
                 return ret
@@ -296,10 +293,15 @@ class Deploy():
         else:
             raise Exception(u'invalid stage: %s' % self.stage)
 
+    def get_configure(self):
+        return self.conf_dict
+
     def launch_resources(self):
         if not self.resources_template:
             raise Exception(u'not load resources template')
-        if self.resources_template and u'Resources' in resources_template:
+        if self.resources_template and u'Resources' in self.resources_template:
+            vendor = self.vendor
+            region = self.region
             keypair_path = create_keypair_by_vendor_and_region(self.stack_name, vendor, region)
             self.keypair_path = keypair_path
             self._launch_resources(self.resources_template[u'Resources'], self.stack_name)
@@ -369,8 +371,8 @@ class Deploy():
                 if start_flag:
                     resources_string = u'%s%s' % (resources_string, line)
         t = Template(resources_string)
-        if self.configure_dict and u'Parameters' in self.configure_dict:
-            parameters_dict = self.configure_dict[u'Parameters']
+        if self.conf_dict and u'Parameters' in self.conf_dict:
+            parameters_dict = self.conf_dict[u'Parameters']
         else:
             parameters_dict = {}
         after_render = t.render(parameters_dict)
@@ -407,15 +409,15 @@ class Deploy():
             elif t == u'Instance':
                 for i in range(0, number):
                     uuid = u'%s/%s:%d' % (parent, name, i)
-                    vendor = self.conf_dict[u'Vendor']
-                    region = self.conf_dict[u'region']
+                    vendor = self.vendor
+                    region = self.region
                     profiles_dict = self.conf_dict[u'Instances'][name]
                     profiles = []
                     for item in profiles_dict:
-                        name = item[len(name)+1:]
+                        real_name = item[len(name)+1:]
                         value = profiles_dict[item]
                         profile = {}
-                        profile[u'Name'] = name
+                        profile[u'Name'] = real_name
                         profile[u'Value'] = value
                         profiles.append(profile)
                     launch_instance_by_vendor_and_region(uuid, profiles, self.stack_name, vendor, region)

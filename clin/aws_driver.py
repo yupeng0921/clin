@@ -23,9 +23,8 @@ class Driver():
         return None
     def create_keypair(self, keypair_name, region):
         return None
-    def launch_instance_by_vendor_and_region(self, uuid, profiles, \
-                                                 keypair_name, vendor, \
-                                                 region):
+    def launch_instance(self, uuid, profiles, \
+                            keypair_name, region):
         print(uuid)
 
 driver = Driver()

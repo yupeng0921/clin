@@ -10,6 +10,7 @@ import requests
 import argparse
 import getpass
 import base64
+import time
 from api_client import ApiV1Client
 import clin_lib
 
@@ -444,6 +445,14 @@ def clin_deploy(args):
                 continue
             else:
                 break
+    if args.dump_configure in (u'yes', u'only'):
+        configure_dict =deploy.get_configure()
+        file_name = u'%s-%s.yml' % (args.stack_name, int(time.time()))
+        with open(file_name, u'w') as f:
+            yaml.safe_dump(configure_dict, f)
+        if args.dump_configure == u'only':
+            return
+    deploy.launch_resources()
 
 def clin_erase(args):
     pass
