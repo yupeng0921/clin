@@ -203,7 +203,7 @@ class Deploy():
                     for profile in profiles:
                         profile[u'Name'] = u'%s %s' % (instance_name, profile[u'Name'])
                     if self.configure_dict and \
-                            u'Instances' in self.configure_dict[u'Instances'] and \
+                            u'Instances' in self.configure_dict and \
                             instance_name in self.configure_dict[u'Instances']:
                         for profile in profiles:
                             name = profile[u'Name']
