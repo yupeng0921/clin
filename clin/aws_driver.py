@@ -40,7 +40,6 @@ class Driver():
         profiles.append(profile)
 
         vpc_id = specialisms[u'vpc'].split(u' ')[1]
-        # vpc_id = vpc_profile[u'Value'].split(' ')[1]
         conn = boto.vpc.connect_to_region(region)
         subnets = conn.get_all_subnets(filters=[('vpcId', [vpc_id])])
         allowed_values = []
@@ -59,7 +58,11 @@ class Driver():
         return None
 
     def launch_instance(self, uuid, profiles, \
-                            keypair_name, region):
+                            keypair_name, region, specialisms):
         print(uuid)
+        print(specialisms[u'vpc'])
+        for profile in profiles:
+            print('%s %s' % (profile['Name'], profile['Value']))
+        print('\n')
 
 driver = Driver()

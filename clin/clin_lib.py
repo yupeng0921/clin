@@ -37,9 +37,9 @@ def create_keypair(keypair_name, vendor, region):
     driver = vendor_dict[vendor]
     return driver.create_keypair(keypair_name, region)
 
-def launch_instance(uuid, profiles, keypair_name, vendor, region):
+def launch_instance(uuid, profiles, keypair_name, vendor, region, specialisms):
     driver = vendor_dict[vendor]
-    return driver.launch_instance(uuid, profiles, keypair_name, region)
+    return driver.launch_instance(uuid, profiles, keypair_name, region, specialisms)
 
 class Deploy():
     def __init__(self, service_dir, stack_name, vendor, region, \
@@ -129,8 +129,8 @@ class Deploy():
                              self.configure_dict[u'Specialisms']:
                          for profile in profiles:
                              name = profile['Name']
-                             if name in configure_dict[u'Specialisms']:
-                                 profile[u'Value'] = configure_dict[u'Specialisms'][name]
+                             if name in self.configure_dict[u'Specialisms']:
+                                 profile[u'Value'] = self.configure_dict[u'Specialisms'][name]
                              else:
                                  raise Exception(u'no %s in configure file' % name)
                          ret = verify_specialisms(profiles, vendor, region)
@@ -167,7 +167,7 @@ class Deploy():
                                 profile[u'Value'] = self.configure_dict[u'Instances'][instance_name][name]
                             else:
                                 raise Exception(u'no %s in configure file' % name)
-                        ret = verify_instance_profiles(profiles, vendor)
+                        ret = verify_instance_profiles(profiles, vendor, region, specialisms)
                         if ret:
                             raise Exception(ret)
                         else:
@@ -379,6 +379,7 @@ class Deploy():
                         profile[u'Name'] = real_name
                         profile[u'Value'] = value
                         profiles.append(profile)
-                    launch_instance(uuid, profiles, self.stack_name, vendor, region)
+                    specialisms = self.conf_dict[u'Specialisms']
+                    launch_instance(uuid, profiles, self.stack_name, vendor, region, specialisms)
             else:
                 raise Exception(u'unknown type: %s' % t)
