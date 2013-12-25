@@ -4,6 +4,7 @@ import os
 import types
 import yaml
 from jinja2 import Template, Environment, FileSystemLoader
+from profile_ops import generate_profile, verify_profile
 
 vendor_dict = {}
 import aws_driver
@@ -12,83 +13,34 @@ vendor_dict[u'aws'] = aws_driver.driver
 def get_vendors():
     return [u'aws']
 
-def get_regions_by_vendor(vendor):
+def get_regions(vendor):
     driver = vendor_dict[vendor]
     return driver.get_regions()
 
-def get_specialism_by_vendor(vendor):
+def get_specialisms(vendor, region):
     driver = vendor_dict[vendor]
-    return driver.get_specialism()
+    return driver.get_specialisms(region)
 
-def verify_specialism_by_vendor(profiles, vendor):
+def verify_specialisms(profiles, vendor, region):
     driver = vendor_dict[vendor]
-    return driver.verify_specialism(profiles)
+    return driver.verify_specialisms(profiles, region)
 
-def get_instance_profiles_by_vendor(vendor):
+def get_instance_profiles(vendor, region, specialisms):
     driver = vendor_dict[vendor]
-    return driver.get_instance_profiles()
+    return driver.get_instance_profiles(region, specialisms)
 
-def verify_instance_profiles_by_vendor(profiles, vendor):
+def verify_instance_profiles(profiles, vendor, region, specialisms):
     driver = vendor_dict[vendor]
-    return driver.verify_instance_profiles(profiles)
+    return driver.verify_instance_profiles(profiles, region, specialisms)
 
-def create_keypair_by_vendor_and_region(keypair_name, vendor, region):
+def create_keypair(keypair_name, vendor, region):
     driver = vendor_dict[vendor]
     return driver.create_keypair(keypair_name, region)
 
-def launch_instance_by_vendor_and_region(uuid, profiles, keypair_name, vendor, region):
+def launch_instance(uuid, profiles, keypair_name, vendor, region):
     driver = vendor_dict[vendor]
     return driver.launch_instance(uuid, profiles, keypair_name, region)
 
-def generate_profile(name, t, description, allowed_values=None, max_value=None, min_value=None):
-    profile = {}
-    profile[u'Name'] = name
-    profile[u'Type'] = t
-    profile[u'Description'] = description
-    profile[u'AllowedValues'] = allowed_values
-    profile[u'MaxValue'] = max_value
-    profile[u'MinValue'] = min_value
-    return profile
-
-def verify_profile(profile):
-    value = profile[u'Value']
-    if profile[u'Type'] == u'List':
-        if type(value) is not types.ListType:
-            return u'should input a list'
-        allowed_values = profile[u'AllowedValues']
-        if allowed_values:
-            for v in value:
-                if v not in allowed_values:
-                    return u'%s not in allowed values' % v
-    elif profile[u'Type'] == u'String':
-        if u'AllowedValues' in profile:
-            allowed_values = profile[u'AllowedValues']
-        else:
-            allowed_values = None
-        if allowed_values:
-            if value not in allowed_values:
-                return u'%s not in allowed values' % value
-        if u'MaxValue' in profile:
-            max_value = profile[u'MaxValue']
-        else:
-            max_value = None
-        if u'MinValue' in profile:
-            min_value = profile[u'MinValue']
-        else:
-            min_value = None
-        if max_value or min_value:
-            try:
-                value = int(value)
-            except Exception, e:
-                return u'%s is not a number' % value
-        if max_value:
-            if value > max_value:
-                return u'%s is larger than %s' % (value, max_value)
-        if min_value:
-            if value < min_value:
-                return u'%s is smaller than %s' % (value, min_value)
-    return None
-    
 class Deploy():
     def __init__(self, service_dir, stack_name, vendor, region, \
                      configure_file, use_compile, \
@@ -107,7 +59,7 @@ class Deploy():
         self.stage = u'init'
         self.conf_dict = {}
         self.conf_dict[u'Parameters'] = {}
-        self.conf_dict[u'Specialism'] = {}
+        self.conf_dict[u'Specialisms'] = {}
         self.conf_dict[u'Instances'] = {}
         self.parameters_stack = []
         self.instances_stack = []
@@ -133,7 +85,7 @@ class Deploy():
                     return [profile]
             elif self.stage == u'Region':
                 vendor = self.vendor
-                allowed_values = get_regions_by_vendor(vendor)
+                allowed_values = get_regions(vendor)
                 profile = generate_profile(u'Region', u'String', u'Region', allowed_values)
                 if self.region:
                     profile[u'Value'] = self.region
@@ -166,31 +118,33 @@ class Deploy():
                         return [profile]
                 else:
                     self._load_resources()
-                    self.stage = u'specialism'
+                    self.stage = u'specialisms'
                     continue
-            elif self.stage == u'specialism':
+            elif self.stage == u'specialisms':
                  vendor = self.vendor
-                 profiles = get_specialism_by_vendor(vendor)
+                 region = self.region
+                 profiles = get_specialisms(vendor, region)
                  if profiles:
-                     if self.configure_dict[u'Specialism']:
+                     if u'Specialisms' in self.configure_dict and \
+                             self.configure_dict[u'Specialisms']:
                          for profile in profiles:
                              name = profile['Name']
-                             if name in configure_dict[u'Specialism']:
-                                 profile[u'Value'] = configure_dict[u'Specialism'][name]
+                             if name in configure_dict[u'Specialisms']:
+                                 profile[u'Value'] = configure_dict[u'Specialisms'][name]
                              else:
                                  raise Exception(u'no %s in configure file' % name)
-                         ret = verify_specialism_by_vendor(profiles, vendor)
+                         ret = verify_specialisms(profiles, vendor, region)
                          if ret:
                              raise Exception(ret)
                          else:
                              for profile in profiles:
                                  name = profile[u'Name']
                                  value = profile[u'Value']
-                                 self.conf_dict[u'Specialism'][name] = value
+                                 self.conf_dict[u'Specialisms'][name] = value
                              self.stage = u'instances'
                              continue
                      else:
-                         self.stage = u'getting_specialism'
+                         self.stage = u'getting_specialisms'
                          return profiles
                  else:
                      self.stage = u'instances'
@@ -199,7 +153,9 @@ class Deploy():
                 if self.instances_stack:
                     instance_name = self.instances_stack.pop()
                     vendor = self.vendor
-                    profiles = get_instance_profiles_by_vendor(vendor)
+                    region = self.region
+                    specialisms = self.conf_dict[u'Specialisms']
+                    profiles = get_instance_profiles(vendor, region, specialisms)
                     for profile in profiles:
                         profile[u'Name'] = u'%s %s' % (instance_name, profile[u'Name'])
                     if self.configure_dict and \
@@ -211,7 +167,7 @@ class Deploy():
                                 profile[u'Value'] = self.configure_dict[u'Instances'][instance_name][name]
                             else:
                                 raise Exception(u'no %s in configure file' % name)
-                        ret = verify_instance_profiles_by_vendor(profiles, vendor)
+                        ret = verify_instance_profiles(profiles, vendor)
                         if ret:
                             raise Exception(ret)
                         else:
@@ -261,21 +217,24 @@ class Deploy():
             self.conf_dict[u'Parameters'][name] = profile[u'Value']
             self.stage = u'parameters'
             return None
-        elif self.stage == u'getting_specialism':
+        elif self.stage == u'getting_specialisms':
             vendor = self.vendor
-            ret = verify_specialism_by_vendor(profiles, vendor)
+            region = self.region
+            ret = verify_specialisms(profiles, vendor, region)
             if ret:
                 return ret
             else:
                 for profile in profiles:
                     name = profile[u'Name']
                     value = profile[u'Value']
-                    self.conf_dict[u'Specialism'][name] = value
+                    self.conf_dict[u'Specialisms'][name] = value
                 self.stage = u'instances'
                 return None
         elif self.stage == u'getting_instances':
             vendor = self.vendor
-            ret = verify_instance_profiles_by_vendor(profiles, vendor)
+            region = self.region
+            specialisms = self.conf_dict[u'Specialisms']
+            ret = verify_instance_profiles(profiles, vendor, region, specialisms)
             if ret:
                 return ret
             else:
@@ -302,7 +261,7 @@ class Deploy():
         if self.resources_template and u'Resources' in self.resources_template:
             vendor = self.vendor
             region = self.region
-            keypair_path = create_keypair_by_vendor_and_region(self.stack_name, vendor, region)
+            keypair_path = create_keypair(self.stack_name, vendor, region)
             self.keypair_path = keypair_path
             self._launch_resources(self.resources_template[u'Resources'], self.stack_name)
 
@@ -420,6 +379,6 @@ class Deploy():
                         profile[u'Name'] = real_name
                         profile[u'Value'] = value
                         profiles.append(profile)
-                    launch_instance_by_vendor_and_region(uuid, profiles, self.stack_name, vendor, region)
+                    launch_instance(uuid, profiles, self.stack_name, vendor, region)
             else:
                 raise Exception(u'unknown type: %s' % t)
