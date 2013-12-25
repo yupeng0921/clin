@@ -370,16 +370,12 @@ class Deploy():
                     uuid = u'%s/%s:%d' % (parent, name, i)
                     vendor = self.vendor
                     region = self.region
-                    profiles_dict = self.conf_dict[u'Instances'][name]
-                    profiles = []
-                    for item in profiles_dict:
+                    profiles_dict = {}
+                    for item in self.conf_dict[u'Instances'][name]:
                         real_name = item[len(name)+1:]
-                        value = profiles_dict[item]
-                        profile = {}
-                        profile[u'Name'] = real_name
-                        profile[u'Value'] = value
-                        profiles.append(profile)
+                        value = self.conf_dict[u'Instances'][name][item]
+                        profiles_dict[real_name] = value
                     specialisms = self.conf_dict[u'Specialisms']
-                    launch_instance(uuid, profiles, self.stack_name, vendor, region, specialisms)
+                    launch_instance(uuid, profiles_dict, self.stack_name, vendor, region, specialisms)
             else:
                 raise Exception(u'unknown type: %s' % t)

@@ -57,12 +57,12 @@ class Driver():
     def create_keypair(self, keypair_name, region):
         return None
 
-    def launch_instance(self, uuid, profiles, \
+    def launch_instance(self, uuid, profiles_dict, \
                             keypair_name, region, specialisms):
         print(uuid)
         print(specialisms[u'vpc'])
-        for profile in profiles:
-            print('%s %s' % (profile['Name'], profile['Value']))
+        for name in profiles_dict:
+            print('%s %s' % (name, profiles_dict[name]))
         print('\n')
 
 driver = Driver()
