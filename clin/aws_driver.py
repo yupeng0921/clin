@@ -36,7 +36,13 @@ class Driver():
     def get_instance_profiles(self, region, specialisms):
         profiles = []
 
-        profile = generate_profile(u'instance type', u'String', 'instance type', [u't1.micro', u'm1.small'])
+        profile = generate_profile(u'instance type', u'String', 'instance type', allowed_values=[u't1.micro', u'm1.small'])
+        profiles.append(profile)
+
+        profile = generate_profile(u'disk size', u'String', u'disk size', max_value=1000, min_value=8)
+        profiles.append(profile)
+
+        profile = generate_profile(u'iops', u'String', u'iops', allowed_values=[u'disable', u'100', u'200', u'400', u'800', u'1000', u'2000', u'4000'])
         profiles.append(profile)
 
         vpc_id = specialisms[u'vpc'].split(u' ')[1]
