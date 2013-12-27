@@ -64,11 +64,24 @@ class Driver():
         return None
 
     def launch_instance(self, uuid, profiles_dict, \
-                            keypair_name, region, specialisms):
+                            keypair_name, region, specialisms, \
+                            total, current):
         print(uuid)
         print(specialisms[u'vpc'])
         for name in profiles_dict:
             print('%s %s' % (name, profiles_dict[name]))
         print('\n')
+
+    def set_instance_sg(self, uuid, sg_rules, region):
+        pass
+
+    def get_username(self, uuid, region):
+        return u'root'
+
+    def get_public_ip(self, uuid, region):
+        return u'0.0.0.0'
+
+    def get_private_ip(self, uuid, region):
+        return u'0.0.0.0'
 
 driver = Driver()
