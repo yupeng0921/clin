@@ -455,7 +455,8 @@ def clin_deploy(args):
     deploy.launch_resources()
 
 def clin_erase(args):
-    pass
+    clin_default_dir = get_default_dir(args)
+    clin_lib.Erase(args.stack_name, args.vendor, args.region, clin_default_dir)
 
 def main():
     parser = argparse.ArgumentParser(prog=u'clin', add_help=True)
@@ -484,8 +485,8 @@ only means only dump configure file, do not do actual deploy')
     parser_deploy.set_defaults(func=clin_deploy)
 
     parser_erase = subparsers.add_parser('erase', help='erase a service from a cloud platform')
-    parser_erase.add_argument('--vendor', help='the cloud platform vendor')
-    parser_erase.add_argument(u'--region', help=u'region of the vendor')
+    parser_erase.add_argument('--vendor', help='the cloud platform vendor', required=True)
+    parser_erase.add_argument(u'--region', help=u'region of the vendor', required=True)
     parser_erase.add_argument(u'--stack-name', required=True, \
                                   help=u'the stack name of the service, \
 shoud be unique per vendor per region')

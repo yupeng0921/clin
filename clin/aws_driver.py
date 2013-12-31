@@ -138,9 +138,12 @@ class Driver():
                 to_port = int(p[1])
             else:
                 raise Exception(u'Invalid rule: %s' % rule)
-            conn.authorize_security_group(uuid, ip_protocol = ip_protocol, \
-                                              from_port = from_port, to_port = to_port, \
-                                              cidr_ip = cidr_ip)
+            filters={'group-name': uuid}
+            sgs=conn.get_all_security_groups(filters=filters)
+            if len(sgs) != 1:
+                raise Exception(u'sg count error, %s' % sgs)
+            sg = sgs[0]
+            sg.authorize(ip_protocol=ip_protocol, from_port=from_port, to_port=to_port, cidr_ip=cidr_ip)
 
     def get_username(self, uuid, region):
         # FIXME
@@ -163,5 +166,70 @@ class Driver():
         r = rs[0]
         i = r.instances[0]
         return i.private_ip_address
+
+    def release_all(self, stack_name, region):
+        conn = boto.ec2.connect_to_region(region)
+        filters = {u'tag:StackName': stack_name}
+        volume_ids = []
+        reservations = conn.get_all_instances(filters = filters)
+        for r in reservations:
+            i = r.instances[0]
+            devs = i.block_device_mapping
+            for dev in devs:
+                volume_ids.append(devs[dev].volume_id)
+            i.terminate()
+        while True:
+            reservations = conn.get_all_instances(filters = filters)
+            all_terminated = True
+            for ins in reservations:
+                for i in ins.instances:
+                    if i.state != u'terminated':
+                        all_terminated = False
+            if all_terminated:
+                break
+            time.sleep(3)
+
+        for volume_id in volume_ids:
+            retry = 5
+            while retry > 0:
+                try:
+                    conn.delete_volume(volume_id)
+                except Exception, e:
+                    time.sleep(1)
+                else:
+                    break
+                retry -= 1
+            if retry == 0:
+                conn.delete_volume(volume_id)
+
+        sgs = conn.get_all_security_groups(filters={u'description': u'stack: %s' % stack_name})
+        for sg in sgs:
+            for rule in sg.rules:
+                for grant in rule.grants:
+                    if grant.group_id:
+                        sg.revoke(rule.ip_protocol, rule.from_port, rule.to_port, grant.cidr_ip, grant)
+                    else:
+                        try:
+                            sg.revoke(rule.ip_protocol, rule.from_port, rule.to_port, grant.cidr_ip, None)
+                        except Exception, e:
+                            pass
+        for sg in sgs:
+            retry = 5
+            while retry > 0:
+                try:
+                    sg.delete()
+                except Exception, e:
+                    time.sleep(1)
+                else:
+                    break
+                retry -= 1
+            if retry == 0:
+                sg.delete()
+
+        keys = conn.get_all_key_pairs(keynames=stack_name)
+        for k in keys:
+            k.delete()
+
+        os.remove(u'%s.pem' % stack_name)
 
 driver = Driver()

@@ -605,3 +605,8 @@ class Deploy():
                 raise Exception(u'unknown attr: %s' % attr)
         else:
             return None
+
+class Erase():
+    def __init__(self, stack_name, vendor, region, clin_default_dir):
+        driver = vendor_dict[vendor]
+        return driver.release_all(stack_name, region)
