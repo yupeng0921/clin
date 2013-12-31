@@ -38,9 +38,9 @@ def create_keypair(keypair_name, vendor, region):
     driver = vendor_dict[vendor]
     return driver.create_keypair(keypair_name, region)
 
-def launch_instance(uuid, profiles, keypair_name, vendor, region, specialisms, total, current):
+def launch_instance(uuid, profiles, keypair_name, os_name, vendor, region, specialisms, number):
     driver = vendor_dict[vendor]
-    return driver.launch_instance(uuid, profiles, keypair_name, region, specialisms, total, current)
+    return driver.launch_instance(uuid, profiles, keypair_name, os_name, region, specialisms, number)
 
 def set_instance_sg(uuid, sg_rules, vendor, region):
     driver = vendor_dict[vendor]
@@ -455,6 +455,7 @@ class Deploy():
                     self._launch_resources(body[u'Members'], uuid)
             elif t == u'Instance':
                 total = number
+                os_name = body[u'OSName']
                 for i in range(0, number):
                     uuid = u'%s/%s:%d' % (parent, name, i)
                     vendor = self.vendor
@@ -468,7 +469,7 @@ class Deploy():
                     if name not in self.instance_dict:
                         self.instance_dict[name] = []
                     self.instance_dict[name].append(Instance(uuid))
-                    launch_instance(uuid, profiles_dict, self.stack_name, vendor, region, specialisms, total, i)
+                    launch_instance(uuid, profiles_dict, self.stack_name, os_name, vendor, region, specialisms, i)
             else:
                 raise Exception(u'unknown type: %s' % t)
 
