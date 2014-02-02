@@ -453,6 +453,14 @@ def clin_deploy(args):
         if args.dump_configure == u'only':
             return
     deploy.launch_resources()
+    while not deploy.is_complete():
+        time.sleep(1)
+        messages = deploy.get_new_messages()
+        for message in messages:
+            print(message)
+    messages = deploy.get_new_messages()
+    for message in messages:
+        print(message)
 
 def clin_erase(args):
     clin_default_dir = get_default_dir(args)

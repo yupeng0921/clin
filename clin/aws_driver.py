@@ -232,4 +232,26 @@ class Driver():
 
         os.remove(u'%s.pem' % stack_name)
 
+    def wait_for_running(self, uuid, region):
+        conn = boto.ec2.connect_to_region(region)
+        interval = 5
+        timeout = 10*60
+        count = 0
+        while True:
+            rs = conn.get_all_instances(filters={u'tag:Name':uuid})
+            if not rs:
+                raise Exception(u'%s not found when wait for running' % uuid)
+            r = rs[0]
+            i = r.instances[0]
+            if i.state == u'running':
+                return
+            elif i.state == u'terminated':
+                raise Exception(u'instance terminate, %s %s' % \
+                                    (uuid, i.id))
+            elif interval * count > timeout:
+                raise Exception(u'timeout, %s %s' % \
+                                    uuid, i.id)
+            time.sleep(interval)
+            count += 1
+
 driver = Driver()

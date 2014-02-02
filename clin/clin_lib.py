@@ -4,6 +4,9 @@ import os
 import types
 import yaml
 import threading
+import paramiko
+import scp
+import time
 from jinja2 import Template, Environment, FileSystemLoader
 from profile_ops import generate_profile, verify_profile
 
@@ -58,6 +61,10 @@ def get_private_ip(uuid, vendor, region):
     driver = vendor_dict[vendor]
     return driver.get_private_ip(uuid, region)
 
+def wait_for_running(uuid, vendor, region):
+    driver = vendor_dict[vendor]
+    return driver.wait_for_running(uuid, region)
+
 class Instance():
     def __init__(self, uuid):
         attrs = [u'private_ip', u'public_ip', u'uuid']
@@ -65,16 +72,17 @@ class Instance():
             self.__dict__[attr] = u'$$%s.%s$$' % (uuid, attr)
 
 class InstanceInit(threading.Thread):
-    def __init__(self, uuid, service_dir, instance_name, hostname, username, keypair_path, \
+    def __init__(self, uuid, service_dir, instance_name, hostname, username, key_filename, \
                      deps, init_parameters, vendor, region, \
                      lock_before_init, lock_on_init, lock_after_init, \
-                     before_init, on_init, after_init):
+                     before_init, on_init, after_init, \
+                     send_message, set_complete):
         self.uuid = uuid
         self.service_dir = service_dir
         self.instance_name = instance_name
         self.hostname = hostname
         self.username = username
-        self.keypair_path = keypair_path
+        self.key_filename = key_filename
         self.deps = deps
         self.init_parameters = init_parameters
         self.vendor = vendor
@@ -85,11 +93,118 @@ class InstanceInit(threading.Thread):
         self.before_init = before_init
         self.on_init = on_init
         self.after_init = after_init
+        self.send_message = send_message
+        self.set_complete = set_complete
         self._running = True
         threading.Thread.__init__(self, name=uuid)
 
     def run(self):
-        pass
+        hostname = self.hostname
+        username = self.username
+        vendor = self.vendor
+        region = self.region
+        uuid = self.uuid
+        key_filename = self.key_filename
+        service_dir = self.service_dir
+        instance_name = self.instance_name
+        deps = self.deps
+        lock_before_init = self.lock_before_init
+        lock_on_init = self.lock_on_init
+        lock_after_init = self.lock_after_init
+        befroe_init = self.before_init
+        on_init = self.on_init
+        after_init = self.after_init
+        send_message = self.send_message
+        set_complete = self.set_complete
+
+        send_message(u'%s: waiting for running' % uuid)
+        wait_for_running(uuid, vendor, region)
+
+        send_message(u'%s: connecting ssh' % uuid)
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        retry = 200
+        while retry > 0:
+            try:
+                ssh.connect(hostname=hostname, username=username, key_filename=key_filename)
+            except Exception, e:
+                time.sleep(3)
+            else:
+                break
+            retry -= 1
+        if retry == 0:
+            ssh.connect(hostname=hostname, username=username, key_filename=key_filename)
+
+        send_message(u'%s: copying data' % uuid)
+        src = u'%s/%s' % (service_dir, instance_name)
+        dst = u'~/'
+        scopy.put(src, dst, True)
+        ssh.close()
+
+        send_message(u'%s: doing stage1' % uuid)
+        cmd = u'bash ~/%s/stage1.sh' % instance_name
+        if username != u'root':
+            cmd = u'sudo %s' % cmd
+        ssh.connect(hostname=hostname, username=username, key_filename=key_filename)
+        (stdin, stdout, stderr) = ssh.exec_command(cmd, timeout=6000)
+        ret = stdout.read()
+        ret = stderr.read()
+        stdout.close()
+        stderr.close()
+        ssh.close()
+
+        if deps:
+            send_message(u'%s: waiting deps' % uuid)
+            while True:
+                lock_after_init.acquire(true)
+                can_init = True
+                for dep in deps:
+                    if dep not in after_init:
+                        can_init = False
+                        break
+                lock_after_init.release()
+                if can_init:
+                    break
+                else:
+                    if not self._running:
+                        send_message(u'%s: stop' % uuid)
+                        return
+                    time.sleep(1)
+
+        lock_before_init.acquire(True)
+        lock_on_init.acquire(True)
+        before_init.remove(uuid)
+        on_init.append(uuid)
+        lock_on_init.release()
+        lock_before_init.release()
+
+        send_message(u'%s: doing state1' % uuid)
+        cmd = u'bash ~/%s/stage2.sh' % instance_name
+        if username != u'root':
+            cmd = u'sudo %s' % cmd
+        ssh.connect(hostname=hostname, username=username, key_filename=key_filename)
+        (stdin, stdout, stderr) = ssh.exec_command(cmd, timeout=6000)
+        ret = stdout.read()
+        ret = stderr.read()
+        stdout.close()
+        stderr.close()
+        ssh.close()
+
+        lock_before_init.acquire(True)
+        lock_on_init.acquire(True)
+        lock_after_init.acquire(True)
+
+        on_init.remove(uuid)
+        after_init.append(uuid)
+
+        if not before_init and not on_init:
+            set_complete()
+
+        lock_after_init.release()
+        lock_on_init.release()
+        lock_before_init.release()
+
+        send_message(u'%s: done' % uuid)
 
     def stop(self):
         self._running = False
@@ -319,8 +434,8 @@ class Deploy():
         if self.resources_template and u'Resources' in self.resources_template:
             vendor = self.vendor
             region = self.region
-            keypair_path = create_keypair(self.stack_name, vendor, region)
-            self.keypair_path = keypair_path
+            key_filename = create_keypair(self.stack_name, vendor, region)
+            self.key_filename = key_filename
             self._launch_resources(self.resources_template[u'Resources'], self.stack_name)
             self.instance_dict = dict(self.instance_dict, **self.conf_dict[u'Parameters'])
             loader = FileSystemLoader(self.service_dir)
@@ -350,7 +465,16 @@ class Deploy():
         self.message_lock.release()
         return messages
 
-    def deploy_complete(self):
+    def send_message(self, message):
+        self.message_lock.acquire(True)
+        self.new_messages.append(message)
+        self.all_messages.append(message)
+        self.message_lock.release()
+
+    def set_complete(self):
+        self.deploy_complete = True
+
+    def is_complete(self):
         return self.deploy_complete
 
     def _load_parameters(self):
@@ -516,10 +640,11 @@ class Deploy():
                     username = get_username(uuid, self.vendor, self.region)
                     hostname = get_public_ip(uuid, self.vendor, self.region)
                     self.before_init.append(uuid)
-                    instance_init = InstanceInit(uuid, self.service_dir, name, hostname, username, self.keypair_path, \
+                    instance_init = InstanceInit(uuid, self.service_dir, name, hostname, username, self.key_filename, \
                                                      deps, init_parameters, self.vendor, self.region, \
                                                      self.lock_before_init, self.lock_on_init, self.lock_after_init, \
-                                                     self.before_init, self.on_init, self.after_init)
+                                                     self.before_init, self.on_init, self.after_init, \
+                                                     self.send_message, self.set_complete)
                     self.instance_init_list.append(instance_init)
                     instance_init.start()
 
