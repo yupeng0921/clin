@@ -461,6 +461,10 @@ def clin_deploy(args):
     messages = deploy.get_new_messages()
     for message in messages:
         print(message)
+    outputs = deploy.get_output()
+    print(outputs)
+    for output in outputs:
+        print(output)
 
 def clin_erase(args):
     clin_default_dir = get_default_dir(args)

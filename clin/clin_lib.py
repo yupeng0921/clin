@@ -111,7 +111,7 @@ class InstanceInit(threading.Thread):
         lock_before_init = self.lock_before_init
         lock_on_init = self.lock_on_init
         lock_after_init = self.lock_after_init
-        befroe_init = self.before_init
+        before_init = self.before_init
         on_init = self.on_init
         after_init = self.after_init
         send_message = self.send_message
@@ -138,6 +138,7 @@ class InstanceInit(threading.Thread):
         send_message(u'%s: copying data' % uuid)
         src = u'%s/%s' % (service_dir, instance_name)
         dst = u'~/'
+        scopy = scp.SCPClient(ssh.get_transport())
         scopy.put(src, dst, True)
         ssh.close()
 
@@ -156,7 +157,7 @@ class InstanceInit(threading.Thread):
         if deps:
             send_message(u'%s: waiting deps' % uuid)
             while True:
-                lock_after_init.acquire(true)
+                lock_after_init.acquire(True)
                 can_init = True
                 for dep in deps:
                     if dep not in after_init:
@@ -477,6 +478,37 @@ class Deploy():
     def is_complete(self):
         return self.deploy_complete
 
+    def get_output(self):
+        if not self.deploy_complete:
+            raise Exception(u'not complete')
+        with open(u'%s/init.yml' % self.service_dir, u'r') as f:
+            start_flag = False
+            o = u'Outputs'
+            outputs_string = u''
+            for line in f:
+                if line[0:len(o)] == o:
+                    start_flag = True
+                if start_flag:
+                    outputs_string = u'%s%s' % (outputs_string, line)
+        t = Template(outputs_string)
+        if self.conf_dict and u'Parameters' in self.conf_dict:
+            parameters_dict = self.conf_dict[u'Parameters']
+        else:
+            parameters_dict = {}
+        parameters_dict = dict(parameters_dict, **self.instance_dict)
+        after_render = t.render(parameters_dict)
+        outputs_template = yaml.safe_load(after_render)
+        output_list = []
+        if outputs_template and u'Outputs' in outputs_template:
+            self.current_position = u'%s/&&&&&&&&' % self.stack_name
+            outputs = outputs_template[u'Outputs']
+            if outputs:
+                for item in outputs:
+                    real_item = self._explain(item)
+                    if real_item:
+                        output_list.append(real_item)
+        return output_list
+
     def _load_parameters(self):
         parameters_string = u''
         with open(u'%s/init.yml' % self.service_dir, u'r') as f:
@@ -624,6 +656,8 @@ class Deploy():
                             rule = self._explain(rule)
                             if rule:
                                 sg_rules.append(rule)
+                    # FIXME
+                    sg_rules.append(u'tcp 22 0.0.0.0/0')
                     init_parameters = []
                     if u'InitParameters' in c:
                         for param in c[u'InitParameters']:
@@ -724,6 +758,7 @@ class Deploy():
                 return private_ip
             elif attr == u'public_ip':
                 public_ip = get_public_ip(ori_uuid, self.vendor, self.region)
+                return public_ip
             elif attr == u'uuid':
                 return ori_uuid
             else:

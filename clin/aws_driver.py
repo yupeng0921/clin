@@ -9,6 +9,7 @@ try:
     import boto
     import boto.vpc
     import boto.ec2
+    import boto.ec2.networkinterface
 except Exception, e:
     have_boto = False
 else:
@@ -94,12 +95,18 @@ class Driver():
         bdm = boto.ec2.blockdevicemapping.BlockDeviceMapping(connection=conn)
         root_name = conn.get_all_images(image_ids=os_id)[0].block_device_mapping.keys()[0]
         bdm[root_name] = root_dev
+
+        interface = boto.ec2.networkinterface.NetworkInterfaceSpecification(subnet_id=subnet_id,
+                                                                            groups=[sg.id],
+                                                                            associate_public_ip_address=True)
+        interfaces = boto.ec2.networkinterface.NetworkInterfaceCollection(interface)
         retry = 5
         while retry > 0:
             try:
                 r = conn.run_instances(image_id=os_id, key_name=key_name, \
-                                           instance_type=instance_type, security_group_ids=[sg.id], \
-                                           block_device_map=bdm, subnet_id=subnet_id)
+                                           instance_type=instance_type, \
+                                           block_device_map=bdm, \
+                                           network_interfaces=interfaces)
             except Exception, e:
                 time.sleep(1)
             else:
@@ -107,9 +114,9 @@ class Driver():
             retry -= 1
         if retry == 0:
             r = conn.run_instances(image_id=os_id, key_name=key_name, \
-                                       instance_type=instance_type, security_group_ids=[sg.id], \
-                                       block_device_map=bdm, subnet_id=subnet_id)
-
+                                           instance_type=instance_type, \
+                                           block_device_map=bdm, \
+                                           network_interfaces=interfaces)
         instance_id = r.instances[0].id
         tags = {}
         tags[u'Name'] = uuid
