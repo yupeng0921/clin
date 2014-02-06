@@ -145,7 +145,7 @@ class Driver():
                 to_port = int(p[1])
             else:
                 raise Exception(u'Invalid rule: %s' % rule)
-            filters={'group-name': uuid}
+            filters={u'group-name': uuid}
             sgs=conn.get_all_security_groups(filters=filters)
             if len(sgs) != 1:
                 raise Exception(u'sg count error, %s' % sgs)
@@ -260,5 +260,36 @@ class Driver():
                                     uuid, i.id)
             time.sleep(interval)
             count += 1
+
+    def open_ssh(self, uuid, region):
+        conn = boto.ec2.connect_to_region(region)
+        filters={u'group-name': uuid}
+        sgs=conn.get_all_security_groups(filters=filters)
+        for sg in sgs:
+            for rule in sg.rules:
+                if rule.ip_protocol == u'tcp' and rule.from_port == u'22' and rule.to_port == u'22':
+                    for grant in rule.grants:
+                        if grant.cidr_ip == u'0.0.0.0/0':
+                            return False
+        for sg in sgs:
+            sg.authorize(ip_protocol=u'tcp', from_port = u'22', to_port = u'22', cidr_ip = u'0.0.0.0/0')
+        return True
+
+    def close_ssh(self, uuid, region, ret):
+        if not ret:
+            return
+        conn = boto.ec2.connect_to_region(region)
+        filters={u'group-name': uuid}
+        sgs=conn.get_all_security_groups(filters=filters)
+        for sg in sgs:
+            for rule in sg.rules:
+                if rule.ip_protocol == u'tcp' and rule.from_port == u'22' and rule.to_port == u'22':
+                    for grant in rule.grants:
+                        if grant.cidr_ip == u'0.0.0.0/0':
+                            try:
+                                sg.revoke(rule.ip_protocol, rule.from_port, rule.to_port, grant.cidr_ip, None)
+                            except Exception, e:
+                                pass
+                            return
 
 driver = Driver()

@@ -65,6 +65,14 @@ def wait_for_running(uuid, vendor, region):
     driver = vendor_dict[vendor]
     return driver.wait_for_running(uuid, region)
 
+def open_ssh(uuid, vendor, region):
+    driver = vendor_dict[vendor]
+    return driver.open_ssh(uuid, region)
+
+def close_ssh(uuid, vendor, region, ret):
+    driver = vendor_dict[vendor]
+    return driver.close_ssh(uuid, region, ret)
+
 class Instance():
     def __init__(self, uuid):
         attrs = [u'private_ip', u'public_ip', u'uuid']
@@ -122,6 +130,9 @@ class InstanceInit(threading.Thread):
         wait_for_running(uuid, vendor, region)
 
         send_message(u'%s: connecting ssh' % uuid)
+
+        ssh_ret = open_ssh(uuid, vendor, region)
+
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         retry = 200
@@ -193,6 +204,8 @@ class InstanceInit(threading.Thread):
         stdout.close()
         stderr.close()
         ssh.close()
+
+        close_ssh(uuid, vendor, region, ssh_ret)
 
         lock_before_init.acquire(True)
         lock_on_init.acquire(True)
@@ -659,8 +672,6 @@ class Deploy():
                             rule = self._explain(rule)
                             if rule:
                                 sg_rules.append(rule)
-                    # FIXME
-                    sg_rules.append(u'tcp 22 0.0.0.0/0')
                     init_parameters = []
                     if u'InitParameters' in c:
                         for param in c[u'InitParameters']:
