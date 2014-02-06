@@ -1,0 +1,18 @@
+Instances:
+  InstanceX:
+    InstanceX disk size: '8'
+    InstanceX instance type: m1.small
+    InstanceX iops: disable
+    InstanceX subnets: [10.0.0.0/24 subnet-4b89ad0d, 10.0.1.0/24 subnet-5a89ad1c]
+  InstanceY:
+    InstanceY disk size: '8'
+    InstanceY instance type: m1.small
+    InstanceY iops: disable
+    InstanceY subnets: [10.0.0.0/24 subnet-4b89ad0d, 10.0.1.0/24 subnet-5a89ad1c]
+  InstanceZ:
+    InstanceZ disk size: '8'
+    InstanceZ instance type: m1.small
+    InstanceZ iops: disable
+    InstanceZ subnets: [10.0.0.0/24 subnet-4b89ad0d, 10.0.1.0/24 subnet-5a89ad1c]
+Parameters: {ClientCidr: 0.0.0.0/0, EnableGroupA: true, GroupANumber: '2', InstanceXNumber: '3'}
+Specialisms: {vpc: 10.0.0.0/16 vpc-7f8e901d}

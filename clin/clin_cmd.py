@@ -462,7 +462,7 @@ def clin_deploy(args):
     for message in messages:
         print(message)
     outputs = deploy.get_output()
-    print(outputs)
+    print(u'Outputs:')
     for output in outputs:
         print(output)
 

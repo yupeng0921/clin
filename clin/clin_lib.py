@@ -114,6 +114,7 @@ class InstanceInit(threading.Thread):
         before_init = self.before_init
         on_init = self.on_init
         after_init = self.after_init
+        init_parameters = self.init_parameters
         send_message = self.send_message
         set_complete = self.set_complete
 
@@ -179,10 +180,12 @@ class InstanceInit(threading.Thread):
         lock_on_init.release()
         lock_before_init.release()
 
-        send_message(u'%s: doing state1' % uuid)
+        send_message(u'%s: doing state2' % uuid)
         cmd = u'bash ~/%s/stage2.sh' % instance_name
         if username != u'root':
             cmd = u'sudo %s' % cmd
+        for p in init_parameters:
+            cmd = u'%s %s' % (cmd, p)
         ssh.connect(hostname=hostname, username=username, key_filename=key_filename)
         (stdin, stdout, stderr) = ssh.exec_command(cmd, timeout=6000)
         ret = stdout.read()
