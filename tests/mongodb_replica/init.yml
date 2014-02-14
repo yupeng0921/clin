@@ -1,0 +1,32 @@
+Version: 1
+
+Parameters:
+  SecondaryNumber:
+    Description: the replica secondary number
+    Type: Parameter
+    Default: 2
+    AllowedValue: [0, 2, 4, 6]
+  ClientCidr:
+    Description: allow which address to access mongodb
+    Type: Parameter
+    Default: 0.0.0.0/32
+
+Resources:
+  ReplicaPrimary:
+    Description: the primary instance
+    Type: Instance
+    OSName: centos
+    Number: 1
+  ReplicaSecondary:
+    Description: the secondary instances
+    Type: Instance
+    OSName: centos
+    Number: {{SecondaryNumber}}
+
+Outputs:
+  {% for ins in ReplicaPrimary %}
+  - "pirmary: {{ins.private_ip}}"
+  {% endfor %}
+  {% for ins in ReplicaSecondary %}
+  - "secondary: {{ins.private_ip}}"
+  {% endfor %}
