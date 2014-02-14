@@ -100,7 +100,7 @@ class Driver():
                                                                             groups=[sg.id],
                                                                             associate_public_ip_address=True)
         interfaces = boto.ec2.networkinterface.NetworkInterfaceCollection(interface)
-        retry = 5
+        retry = 10
         while retry > 0:
             try:
                 r = conn.run_instances(image_id=os_id, key_name=key_name, \
@@ -121,7 +121,7 @@ class Driver():
         tags = {}
         tags[u'Name'] = uuid
         tags[u'StackName'] = key_name
-        retry = 5
+        retry = 10
         while retry > 0:
             try:
                 conn.create_tags(instance_id, tags)
@@ -148,7 +148,7 @@ class Driver():
             filters={u'group-name': uuid}
             sgs=conn.get_all_security_groups(filters=filters)
             if len(sgs) != 1:
-                raise Exception(u'sg count error, %s' % sgs)
+                raise Exception(u'sg count error, %s %s' % (filters, sgs))
             sg = sgs[0]
             sg.authorize(ip_protocol=ip_protocol, from_port=from_port, to_port=to_port, cidr_ip=cidr_ip)
 
@@ -174,6 +174,11 @@ class Driver():
         i = r.instances[0]
         return i.private_ip_address
 
+    def get_hostname(self, uuid, region):
+        private_ip = self.get_private_ip(uuid, region)
+        hostname = u'ip-%s' % private_ip.replace(u'.', u'-', 4)
+        return hostname
+
     def release_all(self, stack_name, region):
         conn = boto.ec2.connect_to_region(region)
         filters = {u'tag:StackName': stack_name}
@@ -197,7 +202,7 @@ class Driver():
             time.sleep(3)
 
         for volume_id in volume_ids:
-            retry = 5
+            retry = 10
             while retry > 0:
                 try:
                     conn.delete_volume(volume_id)
@@ -221,7 +226,7 @@ class Driver():
                         except Exception, e:
                             pass
         for sg in sgs:
-            retry = 5
+            retry = 10
             while retry > 0:
                 try:
                     sg.delete()

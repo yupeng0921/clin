@@ -61,6 +61,10 @@ def get_private_ip(uuid, vendor, region):
     driver = vendor_dict[vendor]
     return driver.get_private_ip(uuid, region)
 
+def get_hostname(uuid, vendor, region):
+    driver = vendor_dict[vendor]
+    return driver.get_hostname(uuid, region)
+
 def wait_for_running(uuid, vendor, region):
     driver = vendor_dict[vendor]
     return driver.wait_for_running(uuid, region)
@@ -75,7 +79,7 @@ def close_ssh(uuid, vendor, region, ret):
 
 class Instance():
     def __init__(self, uuid):
-        attrs = [u'private_ip', u'public_ip', u'uuid']
+        attrs = [u'private_ip', u'public_ip', u'uuid', u'hostname']
         for attr in attrs:
             self.__dict__[attr] = u'$$%s.%s$$' % (uuid, attr)
 
@@ -161,7 +165,9 @@ class InstanceInit(threading.Thread):
         ssh.connect(hostname=hostname, username=username, key_filename=key_filename)
         (stdin, stdout, stderr) = ssh.exec_command(cmd, timeout=6000)
         ret = stdout.read()
+        send_message(u'%s stage1 stdout: %s' % (uuid, ret))
         ret = stderr.read()
+        send_message(u'%s stage1 stderr: %s' % (uuid, ret))
         stdout.close()
         stderr.close()
         ssh.close()
@@ -200,7 +206,9 @@ class InstanceInit(threading.Thread):
         ssh.connect(hostname=hostname, username=username, key_filename=key_filename)
         (stdin, stdout, stderr) = ssh.exec_command(cmd, timeout=6000)
         ret = stdout.read()
+        send_message(u'%s stage2 stdout: %s' % (uuid, ret))
         ret = stderr.read()
+        send_message(u'%s stage2 stderr: %s' % (uuid, ret))
         stdout.close()
         stderr.close()
         ssh.close()
@@ -773,6 +781,9 @@ class Deploy():
             elif attr == u'public_ip':
                 public_ip = get_public_ip(ori_uuid, self.vendor, self.region)
                 return public_ip
+            elif attr == u'hostname':
+                hostname = get_hostname(ori_uuid, self.vendor, self.region)
+                return hostname
             elif attr == u'uuid':
                 return ori_uuid
             else:
