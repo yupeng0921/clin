@@ -108,7 +108,7 @@ class Driver():
                                            block_device_map=bdm, \
                                            network_interfaces=interfaces)
             except Exception, e:
-                time.sleep(1)
+                time.sleep(3)
             else:
                 break
             retry -= 1
@@ -126,7 +126,7 @@ class Driver():
             try:
                 conn.create_tags(instance_id, tags)
             except Exception, e:
-                time.sleep(1)
+                time.sleep(3)
             else:
                 break
             retry -= 1
@@ -207,7 +207,7 @@ class Driver():
                 try:
                     conn.delete_volume(volume_id)
                 except Exception, e:
-                    time.sleep(1)
+                    time.sleep(3)
                 else:
                     break
                 retry -= 1
@@ -231,7 +231,7 @@ class Driver():
                 try:
                     sg.delete()
                 except Exception, e:
-                    time.sleep(1)
+                    time.sleep(3)
                 else:
                     break
                 retry -= 1
