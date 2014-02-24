@@ -260,6 +260,8 @@ def clin_list(args):
             t = yaml.safe_load(f)
         if u'apiserver' in t:
             apiserver = t[u'apiserver']
+    if not apiserver:
+        apiserver = default_api_server
 
     client = ApiV1Client(apiserver)
     if allusers == u'yes':
