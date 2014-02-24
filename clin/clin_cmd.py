@@ -294,6 +294,8 @@ def clin_download(args):
             t = yaml.safe_load(f)
         if u'apiserver' in t:
             apiserver = t[u'apiserver']
+    if not apiserver:
+        apiserver = default_api_server
 
     client = ApiV1Client(apiserver)
     ret = client.get_all_packages(packagename)
