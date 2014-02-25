@@ -158,12 +158,15 @@ class Driver():
 
     def get_public_ip(self, uuid, region):
         conn = boto.ec2.connect_to_region(region)
-        rs = conn.get_all_instances(filters={u'tag:Name':uuid})
-        if not rs:
-            raise Exception(u'%s not found when get public ip' % uuid)
-        r = rs[0]
-        i = r.instances[0]
-        return i.ip_address
+        while True:
+            rs = conn.get_all_instances(filters={u'tag:Name':uuid})
+            if not rs:
+                raise Exception(u'%s not found when get public ip' % uuid)
+            r = rs[0]
+            i = r.instances[0]
+            if i.ip_address:
+                return i.ip_address
+            time.sleep(3)
 
     def get_private_ip(self, uuid, region):
         conn = boto.ec2.connect_to_region(region)
@@ -172,7 +175,8 @@ class Driver():
             raise Exception(u'%s not found when get private ip' % uuid)
         r = rs[0]
         i = r.instances[0]
-        return i.private_ip_address
+        if i.private_ip_address:
+            return i.private_ip_address
 
     def get_hostname(self, uuid, region):
         private_ip = self.get_private_ip(uuid, region)

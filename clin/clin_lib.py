@@ -197,7 +197,7 @@ class InstanceInit(threading.Thread):
         lock_on_init.release()
         lock_before_init.release()
 
-        send_message(u'%s: doing state2' % uuid)
+        send_message(u'%s: doing stage2' % uuid)
         cmd = u'bash ~/%s/stage2.sh' % instance_name
         if username != u'root':
             cmd = u'sudo %s' % cmd
