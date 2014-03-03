@@ -88,7 +88,7 @@ class InstanceInit(threading.Thread):
                      deps, init_parameters, vendor, region, \
                      lock_before_init, lock_on_init, lock_after_init, \
                      before_init, on_init, after_init, \
-                     send_message, set_complete):
+                     send_message, set_complete, debug):
         self.uuid = uuid
         self.service_dir = service_dir
         self.instance_name = instance_name
@@ -107,6 +107,7 @@ class InstanceInit(threading.Thread):
         self.after_init = after_init
         self.send_message = send_message
         self.set_complete = set_complete
+        self.debug = debug
         self._running = True
         threading.Thread.__init__(self, name=uuid)
 
@@ -129,6 +130,7 @@ class InstanceInit(threading.Thread):
         init_parameters = self.init_parameters
         send_message = self.send_message
         set_complete = self.set_complete
+        debug = self.debug
 
         send_message(u'%s: waiting for running' % uuid)
         wait_for_running(uuid, vendor, region)
@@ -143,6 +145,8 @@ class InstanceInit(threading.Thread):
         while retry > 0:
             try:
                 ssh.connect(hostname=hostname, username=username, key_filename=key_filename)
+                if debug:
+                    send_message(u'%s: %s %s %s %s' % (uuid, hostname, username, key_filename, retry))
             except Exception, e:
                 time.sleep(3)
             else:
@@ -150,6 +154,8 @@ class InstanceInit(threading.Thread):
             retry -= 1
         if retry == 0:
             ssh.connect(hostname=hostname, username=username, key_filename=key_filename)
+            if debug:
+                send_message(u'%s: %s %s %s %s' % (uuid, hostname, username, key_filename, retry))
 
         send_message(u'%s: copying data' % uuid)
         src = u'%s/%s' % (service_dir, instance_name)
@@ -173,7 +179,7 @@ class InstanceInit(threading.Thread):
         ssh.close()
 
         if deps:
-            send_message(u'%s: waiting deps' % uuid)
+            send_message(u'%s: waiting deps %s' % (uuid, deps))
             while True:
                 lock_after_init.acquire(True)
                 can_init = True
@@ -188,7 +194,9 @@ class InstanceInit(threading.Thread):
                     if not self._running:
                         send_message(u'%s: stop' % uuid)
                         return
-                    time.sleep(1)
+                    if debug:
+                        send_message(u'%s: complete deps %s' % (uuid, after_init))
+                    time.sleep(3)
 
         lock_before_init.acquire(True)
         lock_on_init.acquire(True)
@@ -237,7 +245,8 @@ class InstanceInit(threading.Thread):
 class Deploy():
     def __init__(self, service_dir, stack_name, vendor, region, \
                      configure_file, use_compile, \
-                     clin_default_dir):
+                     clin_default_dir, debug):
+        self.debug = debug
         self.service_dir = service_dir
         self.stack_name = stack_name
         self.vendor = vendor
@@ -700,7 +709,7 @@ class Deploy():
                                                      deps, init_parameters, self.vendor, self.region, \
                                                      self.lock_before_init, self.lock_on_init, self.lock_after_init, \
                                                      self.before_init, self.on_init, self.after_init, \
-                                                     self.send_message, self.set_complete)
+                                                     self.send_message, self.set_complete, self.debug)
                     self.instance_init_list.append(instance_init)
                     instance_init.start()
 
