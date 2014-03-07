@@ -161,7 +161,20 @@ class InstanceInit(threading.Thread):
         src = u'%s/%s' % (service_dir, instance_name)
         dst = u'~/'
         scopy = scp.SCPClient(ssh.get_transport())
-        scopy.put(src, dst, True)
+        retry = 3
+        while retry > 0:
+            try:
+                scopy.put(src, dst, True)
+                if debug:
+                    send_message(u'%s: %s %s %s' % (uuid, src, dst, retry))
+            except Exception, e:
+                time.sleep(3)
+            else:
+                break
+        if retry == 0:
+            scopy.put(src, dst, True)
+            if debug:
+                send_message(u'%s: %s %s' % (uuuid, src, dst))
         ssh.close()
 
         send_message(u'%s: doing stage1' % uuid)
@@ -305,6 +318,7 @@ class Deploy():
                     self.stage = u'getting_region'
                     return [profile]
             elif self.stage == u'parameters':
+                # print(self.conf_dict[u'Parameters'])
                 if self.parameters_stack:
                     profile = self.parameters_stack.pop()
                     name = profile[u'Name']
@@ -315,10 +329,15 @@ class Deploy():
                         ret = verify_profile(profile)
                         if ret:
                             raise Exception(ret)
-                        if profile[u'Type'] == u'ParameterGroup' and not profile[u'Value']:
+                        if profile[u'Type'] == u'Boolean' and not profile[u'Value']:
                             for i in range(0, profile[u'SubNumber']):
-                                self.parameters_stack.pop()
+                                profile1 = self.parameters_stack.pop()
+                                if u'DisableValue' in profile1:
+                                    name1 = profile1[u'Name']
+                                    self.conf_dict[u'Parameters'][name1] = profile1[u'DisableValue']
+                                    # print(self.conf_dict[u'Parameters'])
                         self.conf_dict[u'Parameters'][name] = profile[u'Value']
+                        # print('%s %s' % (name, profile[u'Value']))
                         continue
                     else:
                         self.stage = u'getting_parameter'
@@ -417,9 +436,12 @@ class Deploy():
             ret = verify_profile(profile)
             if ret:
                 return ret
-            if profile[u'Type'] == u'ParameterGroup' and not profile[u'Value']:
-                for i in ragne(0, profile[u'SubNumber']):
-                    self.parameters_stack.pop()
+            if profile[u'Type'] == u'Boolean' and not profile[u'Value']:
+                for i in range(0, profile[u'SubNumber']):
+                    profile1 = self.parameters_stack.pop()
+                    if u'DisableValue' in profile1:
+                        name1 = profile1[u'Name']
+                        self.conf_dict[u'Parameters'][name1] = profile1[u'DisableValue']
             name = profile[u'Name']
             self.conf_dict[u'Parameters'][name] = profile[u'Value']
             self.stage = u'parameters'
@@ -573,6 +595,8 @@ class Deploy():
                 profile[u'Name'] = name
                 profile[u'Description'] = body[u'Description']
                 profile[u'Type'] = u'Boolean'
+                if u'DisableValue' in body:
+                    profile[u'DisableValue'] = body[u'DisableValue']
                 profile[u'SubNumber'] = sub_number
                 self.parameters_stack.append(profile)
                 total_number += sub_number
@@ -581,6 +605,8 @@ class Deploy():
                 profile[u'Name'] = name
                 profile[u'Type'] = u'String'
                 profile[u'Description'] = body[u'Description']
+                if u'DisableValue' in body:
+                    profile[u'DisableValue'] = body[u'DisableValue']
                 if u'MinValue' in body:
                     profile[u'MinValue'] = body[u'MinValue']
                 if u'MaxValue' in body:
@@ -594,6 +620,7 @@ class Deploy():
         return total_number
 
     def _load_resources(self):
+        # print(self.conf_dict[u'Parameters'])
         resources_string = u''
         with open(u'%s/init.yml' % self.service_dir, u'r') as f:
             start_flag = False
@@ -608,10 +635,12 @@ class Deploy():
                     resources_string = u'%s%s' % (resources_string, line)
         t = Template(resources_string)
         if self.conf_dict and u'Parameters' in self.conf_dict:
+            # print(self.conf_dict[u'Parameters'])
             parameters_dict = self.conf_dict[u'Parameters']
         else:
             parameters_dict = {}
         after_render = t.render(parameters_dict)
+        # print(parameters_dict)
         resources_template = yaml.safe_load(after_render)
         self.resources_template = resources_template
         if resources_template and u'Resources' in resources_template:
@@ -667,6 +696,7 @@ class Deploy():
             body = resources[name]
             t = body[u'Type']
             number = body[u'Number']
+            # print(body)
             if number <= 0:
                 continue
             if t == u'InstanceGroup':
@@ -682,6 +712,7 @@ class Deploy():
                 c = yaml.safe_load(r)
                 for i in range(0, number):
                     uuid = u'%s/%s:%d' % (parent, name, i)
+                    print(u'prepare to launch: %s' % uuid)
                     self.current_position = uuid
                     sg_rules = []
                     if u'SecurityGroupRules' in c:
