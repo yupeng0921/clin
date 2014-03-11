@@ -1,0 +1,8 @@
+SecurityGroupRules:
+  - tcp 0-65535 0.0.0.0/0
+
+InitParameters:
+  - {{ SharedNumber }}
+  {% for ins in ReplicaPrimary %}
+  - {{ ins.private_ip }}
+  {% endfor %}

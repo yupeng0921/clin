@@ -1,0 +1,77 @@
+Version: 1
+
+Parameters:
+  EnableShare:
+    Description: enable share
+    Type: ParameterGroup
+    Default: True
+    Members:
+      SharedNumber:
+        Description: number of share group
+        Type: Parameter
+        Default: 2
+        MinValue: 1
+        DisableValue: 1
+      ConfigNumber:
+        Description: number of config server
+        Type: Parameter
+        Default: 3
+        MinValue: 1
+        DisableValue: 0
+      RouterNumber:
+        Description: number of router server
+        Type: Parameter
+        Default: 2
+        MinValue: 1
+        DisableValue: 0
+  SecondaryNumber:
+    Description: secondary server per replica
+    Type: Parameter
+    Default: 2
+    MinValue: 0
+    AllowedValues: [0, 2, 4, 6]
+  ClientCidr:
+    Description: client cidr range want to allowed
+    Type: Parameter
+    Default: 0.0.0.0/0
+
+Resources:
+  SharedGroup:
+    Type: InstanceGroup
+    Description: group for shared
+    Number: {{SharedNumber}}
+    Members:
+      ReplicaPrimary:
+        Type: Instance
+        Description: primary instance in replica
+        Number: 1
+        OSName: centos
+      ReplicaSecondary:
+        Type: Instance
+        Description: secondary instance in replica
+        Number: {{SecondaryNumber}}
+        OSName: centos
+  ConfigInstance:
+    Type: Instance
+    Description: config instance
+    Number: {{ConfigNumber}}
+    OSName: centos
+  RouterInstance:
+    Type: Instance
+    Description: router instance
+    Number: {{RouterNumber}}
+    OSName: centos
+
+Outputs:
+  {% if EnableShare %}
+  {% for ins in RouterInstance %}
+  - "router ip: {{ ins.private_ip }}"
+  {% endfor %}
+  {% else %}
+  {% for ins in ReplicaPrimary %}
+  - "pirmary: {{ins.private_ip}}"
+  {% endfor %}
+  {% for ins in ReplicaSecondary %}
+  - "secondary: {{ins.private_ip}}"
+  {% endfor %}
+  {% endif %}

@@ -1,0 +1,16 @@
+SecurityGroupRules:
+  - tcp 0-65535 0.0.0.0/0
+
+InitParameters:
+  - {{ RouterNumber }}
+  {% for ins in RouterInstance %}
+  - {{ ins.private_ip }}
+  {% endfor %}
+  - {{ ConfigNumber }}
+  {% for ins in ConfigInstance %}
+  - {{ ins.private_ip }}
+  {% endfor %}
+  - {{ SharedNumber }}
+  {% for ins in ReplicaPrimary %}
+  - {{ ins.private_ip }}
+  {% endfor %}
