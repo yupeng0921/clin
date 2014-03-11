@@ -71,8 +71,8 @@ do
 done
 
 for i in `seq 0 $((replica_count-1))`; do
-	ip=${private_ips[$i]}
-	echo "rs.add(\"$ip\")" | mongo
+	hostname=${hostnames[$i]}
+	echo "rs.add(\"$hostname\")" | mongo
 done
 
 exit 0
