@@ -318,7 +318,6 @@ class Deploy():
                     self.stage = u'getting_region'
                     return [profile]
             elif self.stage == u'parameters':
-                # print(self.conf_dict[u'Parameters'])
                 if self.parameters_stack:
                     profile = self.parameters_stack.pop()
                     name = profile[u'Name']
@@ -335,9 +334,7 @@ class Deploy():
                                 if u'DisableValue' in profile1:
                                     name1 = profile1[u'Name']
                                     self.conf_dict[u'Parameters'][name1] = profile1[u'DisableValue']
-                                    # print(self.conf_dict[u'Parameters'])
                         self.conf_dict[u'Parameters'][name] = profile[u'Value']
-                        # print('%s %s' % (name, profile[u'Value']))
                         continue
                     else:
                         self.stage = u'getting_parameter'
@@ -620,7 +617,6 @@ class Deploy():
         return total_number
 
     def _load_resources(self):
-        # print(self.conf_dict[u'Parameters'])
         resources_string = u''
         with open(u'%s/init.yml' % self.service_dir, u'r') as f:
             start_flag = False
@@ -635,12 +631,10 @@ class Deploy():
                     resources_string = u'%s%s' % (resources_string, line)
         t = Template(resources_string)
         if self.conf_dict and u'Parameters' in self.conf_dict:
-            # print(self.conf_dict[u'Parameters'])
             parameters_dict = self.conf_dict[u'Parameters']
         else:
             parameters_dict = {}
         after_render = t.render(parameters_dict)
-        # print(parameters_dict)
         resources_template = yaml.safe_load(after_render)
         self.resources_template = resources_template
         if resources_template and u'Resources' in resources_template:
@@ -696,7 +690,6 @@ class Deploy():
             body = resources[name]
             t = body[u'Type']
             number = body[u'Number']
-            # print(body)
             if number <= 0:
                 continue
             if t == u'InstanceGroup':
@@ -712,7 +705,6 @@ class Deploy():
                 c = yaml.safe_load(r)
                 for i in range(0, number):
                     uuid = u'%s/%s:%d' % (parent, name, i)
-                    print(u'prepare to launch: %s' % uuid)
                     self.current_position = uuid
                     sg_rules = []
                     if u'SecurityGroupRules' in c:
