@@ -4,7 +4,7 @@ log_prefix="mongodb"
 
 function mylog()
 {
-	logger -t $log_prefix $1
+	logger -t "$log_prefix" "$1"
 	echo "$1"
 }
 
@@ -33,13 +33,15 @@ for i in `seq 0 $((replica_count-1))`; do
 done
 
 config_number=$1
+shift 1
 for i in `seq 0 $((config_number-1))`; do
 	echo "$2 $1" >> /etc/hosts
 	shift 2
 done
 
 router_number=$1
-for i in `seq 0 $((config_nuber-1))`; do
+shift 1
+for i in `seq 0 $((router_number-1))`; do
 	echo "$2 $1" >> /etc/hosts
 	shift 2
 done

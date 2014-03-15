@@ -24,6 +24,15 @@ Parameters:
         Default: 2
         MinValue: 1
         DisableValue: 0
+      SharedDatabase:
+        Description: shared database
+        Type: Parameter
+      SharedCollection:
+        Description: shared collection
+        Type: Parameter
+      SharedKey:
+        Description: shared key
+        Type: Parameter
   SecondaryNumber:
     Description: secondary server per replica
     Type: Parameter

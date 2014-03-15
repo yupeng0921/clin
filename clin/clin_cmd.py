@@ -456,7 +456,9 @@ def clin_deploy(args):
             yaml.safe_dump(configure_dict, f)
         if args.dump_configure == u'only':
             return
+    print('launch_resources')
     deploy.launch_resources()
+    print('launching')
     while not deploy.is_complete():
         time.sleep(1)
         messages = deploy.get_new_messages()

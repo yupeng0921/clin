@@ -4,5 +4,21 @@ SecurityGroupRules:
 InitParameters:
   - {{ SharedNumber }}
   {% for ins in ReplicaPrimary %}
+  - {{ ins.hostname }}
+  - {{ ins.private_ip }}
+  {% endfor %}
+  - {{ SecondaryNumber }}
+  {% for ins in ReplicaSecondary %}
+  - {{ ins.hostname }}
+  - {{ ins.private_ip }}
+  {% endfor %}
+  - {{ ConfigNumber }}
+  {% for ins in ConfigInstance %}
+  - {{ ins.hostname }}
+  - {{ ins.private_ip }}
+  {% endfor %}
+  - {{ RouterNumber }}
+  {% for ins in RouterInstance %}
+  - {{ ins.hostname }}
   - {{ ins.private_ip }}
   {% endfor %}

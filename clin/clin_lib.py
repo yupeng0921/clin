@@ -190,9 +190,10 @@ class InstanceInit(threading.Thread):
         stdout.close()
         stderr.close()
         ssh.close()
+        send_message(u'%s: stage1 complete' % uuid)
 
+        send_message(u'%s: waiting deps %s' % (uuid, deps))
         if deps:
-            send_message(u'%s: waiting deps %s' % (uuid, deps))
             while True:
                 lock_after_init.acquire(True)
                 can_init = True
@@ -211,6 +212,7 @@ class InstanceInit(threading.Thread):
                         send_message(u'%s: complete deps %s' % (uuid, after_init))
                     time.sleep(3)
 
+        send_message(u'%s: change list' % uuid)
         lock_before_init.acquire(True)
         lock_on_init.acquire(True)
         before_init.remove(uuid)
@@ -223,7 +225,7 @@ class InstanceInit(threading.Thread):
         if username != u'root':
             cmd = u'sudo %s' % cmd
         for p in init_parameters:
-            cmd = u'%s %s' % (cmd, p)
+            cmd = u'%s "%s"' % (cmd, p)
         ssh.connect(hostname=hostname, username=username, key_filename=key_filename)
         (stdin, stdout, stderr) = ssh.exec_command(cmd, timeout=6000)
         ret = stdout.read()
@@ -233,6 +235,7 @@ class InstanceInit(threading.Thread):
         stdout.close()
         stderr.close()
         ssh.close()
+        send_message(u'%s stage2 complete' % uuid)
 
         close_ssh(uuid, vendor, region, ssh_ret)
 
