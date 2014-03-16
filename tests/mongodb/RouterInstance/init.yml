@@ -1,5 +1,6 @@
 SecurityGroupRules:
-  - tcp 27017 0.0.0.0/0
+  - tcp 27017 {{ ServerCidr }}
+  - tcp 27017 {{ ClientCidr }}
 
 InitParameters:
   - {{ SharedNumber }}

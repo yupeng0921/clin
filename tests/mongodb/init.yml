@@ -43,6 +43,10 @@ Parameters:
     Description: client cidr range want to allowed
     Type: Parameter
     Default: 0.0.0.0/0
+  ServerCidr:
+    Description: mongodb server allocate to which cidr range
+    Type: Parameter
+    Default: 0.0.0.0/0
 
 Resources:
   SharedGroup:

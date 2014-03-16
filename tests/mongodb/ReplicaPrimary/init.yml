@@ -1,5 +1,10 @@
 SecurityGroupRules:
-  - tcp 27017 0.0.0.0/0
+  {% if EnableShare %}
+  - tcp 27017 {{ ServerCidr }}
+  {% else %}
+  - tcp 27017 {{ ServerCidr }}
+  - tcp 27017 {{ ClientCidr }}
+  {% endif %}
 
 InitParameters:
   {% for ins in ReplicaPrimary %}
