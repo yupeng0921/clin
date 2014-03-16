@@ -78,10 +78,14 @@ def close_ssh(uuid, vendor, region, ret):
     return driver.close_ssh(uuid, region, ret)
 
 class Instance():
-    def __init__(self, uuid):
+    def __init__(self, uuid, is_all):
         attrs = [u'private_ip', u'public_ip', u'uuid', u'hostname']
-        for attr in attrs:
-            self.__dict__[attr] = u'$$%s.%s$$' % (uuid, attr)
+        if not is_all:
+            for attr in attrs:
+                self.__dict__[attr] = u'$$%s.%s$$' % (uuid, attr)
+        else:
+            for attr in attrs:
+                self.__dict__[attr] = u'$$%s.%s_all$$' % (uuid, attr)
 
 class InstanceInit(threading.Thread):
     def __init__(self, uuid, service_dir, instance_name, hostname, username, key_filename, \
@@ -681,9 +685,12 @@ class Deploy():
                         value = self.conf_dict[u'Instances'][name][item]
                         profiles_dict[real_name] = value
                     specialisms = self.conf_dict[u'Specialisms']
+                    name_all = u'%s_All' % name
                     if name not in self.instance_dict:
                         self.instance_dict[name] = []
-                    self.instance_dict[name].append(Instance(uuid))
+                        self.instance_dict[name_all] = []
+                    self.instance_dict[name].append(Instance(uuid, False))
+                    self.instance_dict[name_all].append(Instance(uuid, True))
                     launch_instance(uuid, profiles_dict, self.stack_name, os_name, vendor, region, specialisms, i)
             else:
                 raise Exception(u'unknown type: %s' % t)
@@ -809,6 +816,9 @@ class Deploy():
                 if approve == None:
                     approve = True
 
+        if len(attr) > 4 and attr[-4:] == u'_all':
+            approve = True
+            attr = attr[:-4]
         if approve:
             if attr == u'private_ip':
                 private_ip = get_private_ip(ori_uuid, self.vendor, self.region)

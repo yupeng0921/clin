@@ -19,7 +19,7 @@ primary_hostname=$1
 primary_private_ip=$2
 primary_uuid=$3
 
-echo "$primary_private_ip $primary_hostname" >> /etc/hosts
+# echo "$primary_private_ip $primary_hostname" >> /etc/hosts
 
 replica_count=$4
 
@@ -28,6 +28,20 @@ shift 4
 for i in `seq 0 $((replica_count-1))`; do
 	hostnames[$i]=$1
 	private_ips[$i]=$2
+	# echo "$2 $1" >> /etc/hosts
+	shift 2
+done
+
+shared_number=$1
+shift 1
+for i in `seq 0 $((shared_number-1))`; do
+	echo "$2 $1" >> /etc/hosts
+	shift 2
+done
+
+secondary_number=$(($shared_number * $replica_count))
+
+for i in `seq 0 $((secondary_number-1))`; do
 	echo "$2 $1" >> /etc/hosts
 	shift 2
 done

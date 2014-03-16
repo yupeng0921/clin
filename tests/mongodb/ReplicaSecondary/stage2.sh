@@ -26,6 +26,20 @@ for i in `seq 0 $((replica_count-1))`; do
 	shift 2
 done
 
+shared_number=$1
+shift 1
+for i in `seq 0 $((shared_number-1))`; do
+	echo "$2 $1" >> /etc/hosts
+	shift 2
+done
+
+secondary_number=$(($shared_number * $replica_count))
+
+for i in `seq 0 $((secondary_number-1))`; do
+	echo "$2 $1" >> /etc/hosts
+	shift 2
+done
+
 config_number=$1
 shift 1
 for i in `seq 0 $((config_number-1))`; do
