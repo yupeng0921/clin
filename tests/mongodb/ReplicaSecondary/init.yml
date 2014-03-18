@@ -1,0 +1,38 @@
+SecurityGroupRules:
+  {% if EnableShare %}
+  - tcp 27017 {{ ServerCidr }}
+  {% else %}
+  - tcp 27017 {{ ServerCidr }}
+  - tcp 27017 {{ ClientCidr }}
+  {% endif %}
+
+InitParameters:
+  {% for ins in ReplicaPrimary %}
+  - {{ ins.hostname }}
+  - {{ ins.private_ip }}
+  - {{ ins.uuid }}
+  {% endfor %}
+  - {{ SecondaryNumber }}
+  {% for ins in ReplicaSecondary %}
+  - {{ ins.hostname }}
+  - {{ ins.private_ip }}
+  {% endfor %}
+  - {{ SharedNumber }}
+  {% for ins in ReplicaPrimary_All %}
+  - {{ ins.hostname }}
+  - {{ ins.private_ip }}
+  {% endfor %}
+  {% for ins in ReplicaSecondary_All %}
+  - {{ ins.hostname }}
+  - {{ ins.private_ip }}
+  {% endfor %}
+  - {{ ConfigNumber }}
+  {% for ins in ConfigInstance %}
+  - {{ ins.hostname }}
+  - {{ ins.private_ip }}
+  {% endfor %}
+  - {{ RouterNumber }}
+  {% for ins in RouterInstance %}
+  - {{ ins.hostname }}
+  - {{ ins.private_ip }}
+  {% endfor %}

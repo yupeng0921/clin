@@ -435,8 +435,12 @@ def clin_deploy(args):
 
     service_dir = load_template(args.name, clin_default_dir)
 
+    if args.debug == 'yes':
+        debug = True
+    else:
+        debug = False
     deploy = clin_lib.Deploy(service_dir, args.stack_name, args.vendor, args.region, \
-                                 args.configure_file, args.use_compile, clin_default_dir)
+                                 args.configure_file, args.use_compile, clin_default_dir, debug)
     while True:
         profiles = deploy.get_next()
         if not profiles:
@@ -456,7 +460,9 @@ def clin_deploy(args):
             yaml.safe_dump(configure_dict, f)
         if args.dump_configure == u'only':
             return
+    print('launch_resources')
     deploy.launch_resources()
+    print('launching')
     while not deploy.is_complete():
         time.sleep(1)
         messages = deploy.get_new_messages()
@@ -498,6 +504,9 @@ only means only dump configure file, do not do actual deploy')
                                    help=u'use compile', \
                                    choices=(u'yes', u'no', u'auto'), default=u'no')
     parser_deploy.add_argument(u'--clin-default-dir', help=u'the default directory for configure file of clin program')
+    parser_deploy.add_argument(u'--debug', \
+                                   help=u'show debug information when deploy',
+                               choices=(u'yes', u'no'), default=u'no')
     parser_deploy.set_defaults(func=clin_deploy)
 
     parser_erase = subparsers.add_parser('erase', help='erase a service from a cloud platform')

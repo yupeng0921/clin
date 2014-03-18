@@ -78,17 +78,21 @@ def close_ssh(uuid, vendor, region, ret):
     return driver.close_ssh(uuid, region, ret)
 
 class Instance():
-    def __init__(self, uuid):
+    def __init__(self, uuid, is_all):
         attrs = [u'private_ip', u'public_ip', u'uuid', u'hostname']
-        for attr in attrs:
-            self.__dict__[attr] = u'$$%s.%s$$' % (uuid, attr)
+        if not is_all:
+            for attr in attrs:
+                self.__dict__[attr] = u'$$%s.%s$$' % (uuid, attr)
+        else:
+            for attr in attrs:
+                self.__dict__[attr] = u'$$%s.%s_all$$' % (uuid, attr)
 
 class InstanceInit(threading.Thread):
     def __init__(self, uuid, service_dir, instance_name, hostname, username, key_filename, \
                      deps, init_parameters, vendor, region, \
                      lock_before_init, lock_on_init, lock_after_init, \
                      before_init, on_init, after_init, \
-                     send_message, set_complete):
+                     send_message, set_complete, debug):
         self.uuid = uuid
         self.service_dir = service_dir
         self.instance_name = instance_name
@@ -107,6 +111,7 @@ class InstanceInit(threading.Thread):
         self.after_init = after_init
         self.send_message = send_message
         self.set_complete = set_complete
+        self.debug = debug
         self._running = True
         threading.Thread.__init__(self, name=uuid)
 
@@ -129,6 +134,7 @@ class InstanceInit(threading.Thread):
         init_parameters = self.init_parameters
         send_message = self.send_message
         set_complete = self.set_complete
+        debug = self.debug
 
         send_message(u'%s: waiting for running' % uuid)
         wait_for_running(uuid, vendor, region)
@@ -143,6 +149,8 @@ class InstanceInit(threading.Thread):
         while retry > 0:
             try:
                 ssh.connect(hostname=hostname, username=username, key_filename=key_filename)
+                if debug:
+                    send_message(u'%s: %s %s %s %s' % (uuid, hostname, username, key_filename, retry))
             except Exception, e:
                 time.sleep(3)
             else:
@@ -150,12 +158,27 @@ class InstanceInit(threading.Thread):
             retry -= 1
         if retry == 0:
             ssh.connect(hostname=hostname, username=username, key_filename=key_filename)
+            if debug:
+                send_message(u'%s: %s %s %s %s' % (uuid, hostname, username, key_filename, retry))
 
         send_message(u'%s: copying data' % uuid)
         src = u'%s/%s' % (service_dir, instance_name)
         dst = u'~/'
         scopy = scp.SCPClient(ssh.get_transport())
-        scopy.put(src, dst, True)
+        retry = 3
+        while retry > 0:
+            try:
+                scopy.put(src, dst, True)
+                if debug:
+                    send_message(u'%s: %s %s %s' % (uuid, src, dst, retry))
+            except Exception, e:
+                time.sleep(3)
+            else:
+                break
+        if retry == 0:
+            scopy.put(src, dst, True)
+            if debug:
+                send_message(u'%s: %s %s' % (uuuid, src, dst))
         ssh.close()
 
         send_message(u'%s: doing stage1' % uuid)
@@ -171,9 +194,10 @@ class InstanceInit(threading.Thread):
         stdout.close()
         stderr.close()
         ssh.close()
+        send_message(u'%s: stage1 complete' % uuid)
 
+        send_message(u'%s: waiting deps %s' % (uuid, deps))
         if deps:
-            send_message(u'%s: waiting deps' % uuid)
             while True:
                 lock_after_init.acquire(True)
                 can_init = True
@@ -188,8 +212,11 @@ class InstanceInit(threading.Thread):
                     if not self._running:
                         send_message(u'%s: stop' % uuid)
                         return
-                    time.sleep(1)
+                    if debug:
+                        send_message(u'%s: complete deps %s' % (uuid, after_init))
+                    time.sleep(3)
 
+        send_message(u'%s: change list' % uuid)
         lock_before_init.acquire(True)
         lock_on_init.acquire(True)
         before_init.remove(uuid)
@@ -202,7 +229,7 @@ class InstanceInit(threading.Thread):
         if username != u'root':
             cmd = u'sudo %s' % cmd
         for p in init_parameters:
-            cmd = u'%s %s' % (cmd, p)
+            cmd = u'%s "%s"' % (cmd, p)
         ssh.connect(hostname=hostname, username=username, key_filename=key_filename)
         (stdin, stdout, stderr) = ssh.exec_command(cmd, timeout=6000)
         ret = stdout.read()
@@ -212,6 +239,7 @@ class InstanceInit(threading.Thread):
         stdout.close()
         stderr.close()
         ssh.close()
+        send_message(u'%s stage2 complete' % uuid)
 
         close_ssh(uuid, vendor, region, ssh_ret)
 
@@ -237,7 +265,8 @@ class InstanceInit(threading.Thread):
 class Deploy():
     def __init__(self, service_dir, stack_name, vendor, region, \
                      configure_file, use_compile, \
-                     clin_default_dir):
+                     clin_default_dir, debug):
+        self.debug = debug
         self.service_dir = service_dir
         self.stack_name = stack_name
         self.vendor = vendor
@@ -306,9 +335,12 @@ class Deploy():
                         ret = verify_profile(profile)
                         if ret:
                             raise Exception(ret)
-                        if profile[u'Type'] == u'ParameterGroup' and not profile[u'Value']:
+                        if profile[u'Type'] == u'Boolean' and not profile[u'Value']:
                             for i in range(0, profile[u'SubNumber']):
-                                self.parameters_stack.pop()
+                                profile1 = self.parameters_stack.pop()
+                                if u'DisableValue' in profile1:
+                                    name1 = profile1[u'Name']
+                                    self.conf_dict[u'Parameters'][name1] = profile1[u'DisableValue']
                         self.conf_dict[u'Parameters'][name] = profile[u'Value']
                         continue
                     else:
@@ -408,9 +440,12 @@ class Deploy():
             ret = verify_profile(profile)
             if ret:
                 return ret
-            if profile[u'Type'] == u'ParameterGroup' and not profile[u'Value']:
-                for i in ragne(0, profile[u'SubNumber']):
-                    self.parameters_stack.pop()
+            if profile[u'Type'] == u'Boolean' and not profile[u'Value']:
+                for i in range(0, profile[u'SubNumber']):
+                    profile1 = self.parameters_stack.pop()
+                    if u'DisableValue' in profile1:
+                        name1 = profile1[u'Name']
+                        self.conf_dict[u'Parameters'][name1] = profile1[u'DisableValue']
             name = profile[u'Name']
             self.conf_dict[u'Parameters'][name] = profile[u'Value']
             self.stage = u'parameters'
@@ -564,6 +599,8 @@ class Deploy():
                 profile[u'Name'] = name
                 profile[u'Description'] = body[u'Description']
                 profile[u'Type'] = u'Boolean'
+                if u'DisableValue' in body:
+                    profile[u'DisableValue'] = body[u'DisableValue']
                 profile[u'SubNumber'] = sub_number
                 self.parameters_stack.append(profile)
                 total_number += sub_number
@@ -572,6 +609,8 @@ class Deploy():
                 profile[u'Name'] = name
                 profile[u'Type'] = u'String'
                 profile[u'Description'] = body[u'Description']
+                if u'DisableValue' in body:
+                    profile[u'DisableValue'] = body[u'DisableValue']
                 if u'MinValue' in body:
                     profile[u'MinValue'] = body[u'MinValue']
                 if u'MaxValue' in body:
@@ -646,9 +685,12 @@ class Deploy():
                         value = self.conf_dict[u'Instances'][name][item]
                         profiles_dict[real_name] = value
                     specialisms = self.conf_dict[u'Specialisms']
+                    name_all = u'%s_All' % name
                     if name not in self.instance_dict:
                         self.instance_dict[name] = []
-                    self.instance_dict[name].append(Instance(uuid))
+                        self.instance_dict[name_all] = []
+                    self.instance_dict[name].append(Instance(uuid, False))
+                    self.instance_dict[name_all].append(Instance(uuid, True))
                     launch_instance(uuid, profiles_dict, self.stack_name, os_name, vendor, region, specialisms, i)
             else:
                 raise Exception(u'unknown type: %s' % t)
@@ -700,7 +742,7 @@ class Deploy():
                                                      deps, init_parameters, self.vendor, self.region, \
                                                      self.lock_before_init, self.lock_on_init, self.lock_after_init, \
                                                      self.before_init, self.on_init, self.after_init, \
-                                                     self.send_message, self.set_complete)
+                                                     self.send_message, self.set_complete, self.debug)
                     self.instance_init_list.append(instance_init)
                     instance_init.start()
 
@@ -774,6 +816,9 @@ class Deploy():
                 if approve == None:
                     approve = True
 
+        if len(attr) > 4 and attr[-4:] == u'_all':
+            approve = True
+            attr = attr[:-4]
         if approve:
             if attr == u'private_ip':
                 private_ip = get_private_ip(ori_uuid, self.vendor, self.region)
